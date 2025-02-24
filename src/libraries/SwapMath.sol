@@ -3,12 +3,38 @@ pragma solidity ^0.8.20;
 
 import {Math} from "./Math.sol";
 
+/**
+ * @title Swap Math library
+ * @dev Math library to calculate conversions from/to liquidity to/from token amounts
+ */
 library SwapMath {
     error LiquidityOverflow0();
     error LiquidityOverflow1();
 
     uint256 internal constant MAX_FEE = 1e6;
 
+    /**
+     * @dev Get the next sqrt price, as well as the amount of token0 and token1 to be paid/received if a swap were to
+     * occur. The fee is applied to the side that receives the input amount.
+     * If the current ratio is greater than the target ratio, the input is token0 and the output is token1.
+     * If the current ratio is less than the target ratio, the input is token1 and the output is token0.
+     * In any case, the next ratio will always move towards the target ratio, without ever exceeding it.
+     * If deltaAmount is positive, the function will try to swap as much input as possible, up to abs(deltaAmount).
+     * If deltaAmount is negative, the function will try to swap as much input as possible in order to get abs(deltaAmount)
+     * of output token.
+     * In any case, the function will never exceed the exact input (if deltaAmount is positive) or output (if deltaAmount
+     * is negative) amount.
+     * The fee will always be paid in the input token.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioX96` must fit into 128 bits
+     * - `sqrtTargetRatioX96` must fit into 128 bits
+     * - `liquidity` must fit into 127 bits
+     * - `fee` must be less than MAX_FEE
+     * - `deltaAmount` must fit into 128 bits
+     */
     function getDeltaAmounts(
         uint256 sqrtRatioX96,
         uint256 sqrtTargetRatioX96,
@@ -59,6 +85,19 @@ library SwapMath {
         }
     }
 
+    /**
+     * @dev Get the amount of liquidity given two ratios and an amount of token0.
+     * Always rounds down as it's only used to calculate the initial liquidity.
+     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96 and amount0.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioAX96` must fit into 128 bits
+     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `sqrtRatioAX96` must be lower or equal to `sqrtRatioBX96`
+     * - `amount0` must fit into 128 bits
+     */
     function getLiquidity0(uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 amount0)
         internal
         pure
@@ -67,6 +106,18 @@ library SwapMath {
         return Math.fullMulDiv(sqrtRatioAX96 * sqrtRatioBX96, amount0, (sqrtRatioBX96 - sqrtRatioAX96) << 96);
     }
 
+    /**
+     * @dev Get the amount of token0 given two ratios and an amount of liquidity.
+     * Rounds up if `adding` is true, rounds down otherwise.
+     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and amount0.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioAX96` must fit into 128 bits
+     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `liquidity` must fit into 127 bits
+     */
     function getAmount0(uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 liquidity, bool adding)
         internal
         pure
@@ -74,13 +125,27 @@ library SwapMath {
     {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
         unchecked {
-            // Can't overflow as all parameters are all smaller than 2**128-1, and `sqrtRatioAX96 < sqrtRatioBX96`
+            // The unchecked operations can't overflow as all parameters are all smaller than 2**128-1,
+            // and `sqrtRatioAX96 < sqrtRatioBX96`. However, the result might not fit into 256 bits in
+            // some cases, but these cases will be handled within the Math library.
             return adding
                 ? Math.fullMulDivUp(liquidity << 96, (sqrtRatioBX96 - sqrtRatioAX96), sqrtRatioAX96 * sqrtRatioBX96)
                 : Math.fullMulDiv(liquidity << 96, (sqrtRatioBX96 - sqrtRatioAX96), sqrtRatioAX96 * sqrtRatioBX96);
         }
     }
 
+    /**
+     * @dev Get the amount of token1 given two ratios and an amount of liquidity.
+     * Rounds up if `adding` is true, rounds down otherwise.
+     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and amount1.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioAX96` must fit into 128 bits
+     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `liquidity` must fit into 127 bits
+     */
     function getAmount1(uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 liquidity, bool adding)
         internal
         pure
@@ -95,6 +160,22 @@ library SwapMath {
         }
     }
 
+    /**
+     * @dev Get the next sqrt price from an amount of token0.
+     * Always rounds up, because in the exact output case (increasing price) we need to move the price at least
+     * far enough to get the desired output amount, and in the exact input case (decreasing price) we need to move the
+     * price less in order to not send too much output.
+     * We can use the lossless version because of the restriction on sqrtRatio, liquidity and amount0.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     * If the result overflows or underflows, revert with `LiquidityOverflow0()`.
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioX96` must fit into 128 bits
+     * - `liquidity` must fit into 127 bits
+     * - `amount0` must fit into 128 bits
+     * - `sqrtNextX96` must not overflow or underflow
+     */
     function getNextSqrtRatioFromAmount0(uint256 sqrtRatioX96, uint256 liquidity, int256 amount0)
         internal
         pure
@@ -109,6 +190,22 @@ library SwapMath {
         }
     }
 
+    /**
+     * @dev Get the next sqrt price from an amount of token1.
+     * Always rounds down, because in the exact output case (decreasing price) we need to move the price at least
+     * far enough to get the desired output amount, and in the exact input case (increasing price) we need to move the
+     * price less in order to not send too much output.
+     * We can use the lossless version because of the restriction on sqrtRatio, liquidity and amount1.
+     * **The requirements on the parameters need to be enforced by the caller.**
+     * If the result overflows or underflows, revert with `LiquidityOverflow1()`.
+     *
+     * Requirements:
+     *
+     * - `sqrtRatioX96` must fit into 128 bits
+     * - `liquidity` must fit into 127 bits
+     * - `amount1` must fit into 128 bits
+     * - `sqrtNextX96` must not overflow or underflow
+     */
     function getNextSqrtRatioFromAmount1(uint256 sqrtRatioX96, uint256 liquidity, int256 amount1)
         internal
         pure
