@@ -5,7 +5,8 @@ import {Math} from "./Math.sol";
 
 /**
  * @title Swap Math library
- * @dev Math library to calculate conversions from/to liquidity to/from token amounts
+ * @dev Math library to calculate conversions from/to liquidity to/from token amounts.
+ * Inspired by Uniswap V3's libraries: https://github.com/Uniswap/v3-core/tree/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/libraries
  */
 library SwapMath {
     error LiquidityOverflow0();
