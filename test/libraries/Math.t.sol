@@ -119,7 +119,7 @@ contract MathTest is Test {
         y = bound(y, 0, d);
 
         uint256 z;
-        assembly {
+        assembly ("memory-safe") {
             z := div(mul(x, y), y)
         }
 
@@ -151,7 +151,7 @@ contract MathTest is Test {
         y = bound(y, 0, d);
 
         uint256 z;
-        assembly {
+        assembly ("memory-safe") {
             z := div(mul(x, y), y)
         }
 

@@ -82,7 +82,7 @@ library Math {
      * - `d` must be non-zero
      */
     function divUp(uint256 x, uint256 d) internal pure returns (uint256 z) {
-        assembly {
+        assembly ("memory-safe") {
             if iszero(d) {
                 mstore(0x00, 0x65244e4e) // `DivFailed()`.
                 revert(0x1c, 0x04)
@@ -102,7 +102,7 @@ library Math {
      * - The result must fit into 256 bits.
      */
     function fullMulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
-        assembly {
+        assembly ("memory-safe") {
             z := mul(x, y)
             for {} 1 {} {
                 if iszero(mul(or(iszero(x), eq(div(z, x), y)), d)) {
@@ -146,7 +146,7 @@ library Math {
      */
     function fullMulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
         z = fullMulDiv(x, y, d);
-        assembly {
+        assembly ("memory-safe") {
             if mulmod(x, y, d) {
                 z := add(z, 1)
                 if iszero(z) {
