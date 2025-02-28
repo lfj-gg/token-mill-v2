@@ -133,7 +133,7 @@ contract TMMarket is ITMMarket {
      * @dev Returns the sqrt ratios of the two xyk pools.
      * The first pool will be from sqrtRatioAX96 to sqrtRatioBX96, and the second pool will be from sqrtRatioBX96 to sqrtRatioMaxX96.
      */
-    function getSqrtRatios() external view override returns (uint256, uint256, uint256) {
+    function getSqrtRatiosBounds() external view override returns (uint256, uint256, uint256) {
         return (sqrtRatioAX96, sqrtRatioBX96, sqrtRatioMaxX96);
     }
 
@@ -154,7 +154,7 @@ contract TMMarket is ITMMarket {
     /**
      * @dev Returns the current sqrt ratio of the market.
      */
-    function getSqrtRatio() external view override returns (uint256) {
+    function getCurrentSqrtRatio() external view override returns (uint256) {
         return _sqrtRatioX96;
     }
 

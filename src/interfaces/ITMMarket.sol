@@ -31,7 +31,7 @@ interface ITMMarket {
 
     function getLiquidities() external view returns (uint256 liquidityA, uint256 liquidityB);
 
-    function getSqrtRatios()
+    function getSqrtRatiosBounds()
         external
         view
         returns (uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 sqrtRatioMaxX96);
@@ -40,7 +40,7 @@ interface ITMMarket {
 
     function getQuoteToken() external view returns (address);
 
-    function getSqrtRatio() external view returns (uint256 sqrtRatioX96);
+    function getCurrentSqrtRatio() external view returns (uint256 sqrtRatioX96);
 
     function getFee() external view returns (uint256);
 

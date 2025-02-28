@@ -40,7 +40,7 @@ contract TestTMMarket is Test, Parameters {
 
     function test_Constructor() public view {
         assertEq(ITMMarket(market).getFactory(), factory, "test_Constructor::1");
-        (uint256 sqrtPriceA_, uint256 sqrtPriceB_, uint256 sqrtPriceC_) = ITMMarket(market).getSqrtRatios();
+        (uint256 sqrtPriceA_, uint256 sqrtPriceB_, uint256 sqrtPriceC_) = ITMMarket(market).getSqrtRatiosBounds();
         assertEq(sqrtPriceA_, sqrtPrice0, "test_Constructor::2");
         assertEq(sqrtPriceB_, sqrtPrice1, "test_Constructor::3");
         assertEq(sqrtPriceC_, 2 ** 128 - 1, "test_Constructor::4");
@@ -49,7 +49,7 @@ contract TestTMMarket is Test, Parameters {
         assertEq(liquidityB, SwapMath.getLiquidity0(sqrtPrice1, 2 ** 128 - 1, amount0B), "test_Constructor::6");
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Constructor::7");
         assertEq(ITMMarket(market).getQuoteToken(), quoteToken, "test_Constructor::8");
-        assertEq(ITMMarket(market).getSqrtRatio(), sqrtPrice0, "test_Constructor::9");
+        assertEq(ITMMarket(market).getCurrentSqrtRatio(), sqrtPrice0, "test_Constructor::9");
         assertEq(ITMMarket(market).getFee(), defaultFee, "test_Constructor::10");
         (uint256 reserve0, uint256 reserve1) = ITMMarket(market).getReserves();
         assertEq(reserve0, amount0A + amount0B, "test_Constructor::11");
@@ -122,7 +122,7 @@ contract TestTMMarket is Test, Parameters {
         MockERC20(quoteToken).mint(market, 100e18);
         ITMMarket(market).swap(address(0xdead), false, 100e18, 2 ** 128 - 1);
 
-        uint256 sqrtRatio = ITMMarket(market).getSqrtRatio();
+        uint256 sqrtRatio = ITMMarket(market).getCurrentSqrtRatio();
 
         vm.expectRevert(ITMMarket.ZeroDeltaAmount.selector);
         ITMMarket(market).swap(address(1), false, 0, 0);
@@ -264,7 +264,7 @@ contract TestTMMarket is Test, Parameters {
             MockERC20(quoteToken).mint(market, before);
             (int256 maxAmount0,) = ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
 
-            vm.assume(ITMMarket(market).getSqrtRatio() > sqrtPrice0);
+            vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
             amountA = bound(amountA, 1, uint256(-maxAmount0) - 1);
             amountB = bound(amountB, 1, uint256(-maxAmount0) - amountA);
@@ -399,7 +399,7 @@ contract TestTMMarket is Test, Parameters {
             MockERC20(quoteToken).mint(market, before);
             ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
 
-            vm.assume(ITMMarket(market).getSqrtRatio() > sqrtPrice0);
+            vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
             (, maxAmount1) = ITMMarket(market).getDeltaAmounts(true, 2 ** 127 - 1, sqrtPrice0);
 
@@ -475,7 +475,7 @@ contract TestTMMarket is Test, Parameters {
             MockERC20(quoteToken).mint(market, before);
             ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
 
-            vm.assume(ITMMarket(market).getSqrtRatio() > sqrtPrice0);
+            vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
             (, maxAmount1) = ITMMarket(market).getDeltaAmounts(true, 2 ** 127 - 1, sqrtPrice0);
 
@@ -563,7 +563,7 @@ contract TestTMMarket is Test, Parameters {
         MockERC20(quoteToken).mint(market, 1);
         ITMMarket(market).swap(address(this), false, int256(amount1), 2 ** 128 - 1);
 
-        vm.assume(ITMMarket(market).getSqrtRatio() > sqrtPrice0);
+        vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
         (int256 maxAmount0,) = ITMMarket(market).getDeltaAmounts(true, 2 ** 127 - 1, sqrtPrice0);
         amount0 = bound(amount0, 1, uint256(maxAmount0) - 1);

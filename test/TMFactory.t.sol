@@ -241,7 +241,7 @@ contract TestTMFactory is Test {
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Fuzz_CreateMarket::8");
         assertEq(ITMMarket(market).getQuoteToken(), quoteToken, "test_Fuzz_CreateMarket::9");
         assertEq(ITMMarket(market).getFee(), defaultFee, "test_Fuzz_CreateMarket::10");
-        assertEq(ITMMarket(market).getSqrtRatio(), 1 << 96, "test_Fuzz_CreateMarket::11");
+        assertEq(ITMMarket(market).getCurrentSqrtRatio(), 1 << 96, "test_Fuzz_CreateMarket::11");
 
         assertEq(TMFactory(factory).getTokensLength(), 1, "test_Fuzz_CreateMarket::12");
         assertEq(TMFactory(factory).getTokenAt(0), token, "test_Fuzz_CreateMarket::13");
