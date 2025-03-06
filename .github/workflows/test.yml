@@ -37,6 +37,11 @@ jobs:
           forge build --sizes
         id: build
 
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+        id: env
+
       - name: Run Forge tests
         run: |
           forge test -vvv
