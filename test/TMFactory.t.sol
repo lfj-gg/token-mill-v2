@@ -18,6 +18,7 @@ contract TestTMFactory is Test {
     address factory;
 
     uint256 defaultProtocolFeeShare = 0.2e6; // 20%
+    uint256 defaultMinUpdateTime = 100;
     uint256 defaultFee = 0.01e6; // 1%
 
     address admin = makeAddr("admin");
@@ -31,7 +32,14 @@ contract TestTMFactory is Test {
         marketImplementation = address(new TMMarket(factoryAddress, supply / 2, supply / 2, 1 << 96, 2 << 96));
 
         factory = address(
-            new TMFactory(defaultProtocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin)
+            new TMFactory(
+                defaultMinUpdateTime,
+                defaultProtocolFeeShare,
+                defaultFee,
+                marketImplementation,
+                tokenImplementation,
+                admin
+            )
         );
 
         assertEq(factory, factoryAddress, "setUp::1");
@@ -50,14 +58,48 @@ contract TestTMFactory is Test {
         assertEq(TMFactory(factory).hasRole(bytes32(0), admin), true, "test_Constructor::5");
         assertEq(TMFactory(factory).getMarketImplementation(), marketImplementation, "test_Constructor::6");
         assertEq(TMFactory(factory).getTokenImplementation(), tokenImplementation, "test_Constructor::7");
-        assertEq(TMFactory(factory).getProtocolFeeShare(), defaultProtocolFeeShare, "test_Constructor::8");
-        assertEq(TMFactory(factory).getDefaultFee(), defaultFee, "test_Constructor::9");
-        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::10");
-        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::11");
-        assertEq(TMFactory(factory).getQuoteTokensLength(), 0, "test_Constructor::12");
+        assertEq(TMFactory(factory).getMinUpdateTime(), defaultMinUpdateTime, "test_Constructor::8");
+        assertEq(TMFactory(factory).getProtocolFeeShare(), defaultProtocolFeeShare, "test_Constructor::9");
+        assertEq(TMFactory(factory).getDefaultFee(), defaultFee, "test_Constructor::10");
+        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::11");
+        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::12");
+        assertEq(TMFactory(factory).getQuoteTokensLength(), 0, "test_Constructor::13");
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        TMFactory(factory).initialize(0, 0, address(0), address(0), address(0));
+        TMFactory(factory).initialize(0, 0, 0, address(0), address(0), address(0));
+    }
+
+    function test_Fuzz_SetMinUpdateTime(uint256 minUpdateTime) public {
+        minUpdateTime = bound(minUpdateTime, 1, type(uint88).max);
+
+        vm.prank(admin);
+        TMFactory(factory).setMinUpdateTime(minUpdateTime);
+
+        assertEq(TMFactory(factory).getMinUpdateTime(), minUpdateTime, "test_Fuzz_SetMinUpdateTime::1");
+
+        vm.prank(admin);
+        TMFactory(factory).setMinUpdateTime(0);
+
+        assertEq(TMFactory(factory).getMinUpdateTime(), 0, "test_Fuzz_SetMinUpdateTime::2");
+
+        vm.prank(admin);
+        TMFactory(factory).setMinUpdateTime(minUpdateTime);
+
+        assertEq(TMFactory(factory).getMinUpdateTime(), minUpdateTime, "test_Fuzz_SetMinUpdateTime::3");
+    }
+
+    function test_Fuzz_Revert_SetMinUpdateTime(uint256 minUpdateTime) public {
+        minUpdateTime = bound(minUpdateTime, uint256(type(uint88).max) + 1, type(uint256).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(1), bytes32(0))
+        );
+        vm.prank(address(1));
+        TMFactory(factory).setMinUpdateTime(0);
+
+        vm.prank(admin);
+        vm.expectRevert(ITMFactory.InvalidMinUpdateTime.selector);
+        TMFactory(factory).setMinUpdateTime(minUpdateTime);
     }
 
     function test_Fuzz_SetProtocolFeeShare(uint256 protocolFeeShare) public {
@@ -453,31 +495,63 @@ contract TestTMFactory is Test {
         if (creator == address(this)) creator = address(1);
 
         vm.prank(admin);
+        TMFactory(factory).setMinUpdateTime(100);
+
+        vm.prank(admin);
         TMFactory(factory).setQuoteToken(address(0), true);
         (, address market) = TMFactory(factory).createMarket("", "", address(0));
 
         ITMFactory.MarketDetails memory details = TMFactory(factory).getMarketDetails(market);
 
         assertEq(details.initialized, true, "test_Fuzz_UpdateMarketDetails::1");
-        assertEq(details.creator, address(this), "test_Fuzz_UpdateMarketDetails::2");
-        assertEq(details.feeRecipient, ITMFactory(factory).KOTM_FEE_RECIPIENT(), "test_Fuzz_UpdateMarketDetails::3");
+        assertEq(details.lastFeeRecipientUpdate, block.timestamp, "test_Fuzz_UpdateMarketDetails::2");
+        assertEq(details.creator, address(this), "test_Fuzz_UpdateMarketDetails::3");
+        assertEq(details.feeRecipient, ITMFactory(factory).KOTM_FEE_RECIPIENT(), "test_Fuzz_UpdateMarketDetails::4");
 
-        assertEq(TMFactory(factory).getMarketByCreatorLength(address(this)), 1, "test_Fuzz_UpdateMarketDetails::4");
-        assertEq(TMFactory(factory).getMarketByCreatorAt(address(this), 0), market, "test_Fuzz_UpdateMarketDetails::5");
+        assertEq(TMFactory(factory).getMarketByCreatorLength(address(this)), 1, "test_Fuzz_UpdateMarketDetails::5");
+        assertEq(TMFactory(factory).getMarketByCreatorAt(address(this), 0), market, "test_Fuzz_UpdateMarketDetails::6");
 
-        assertEq(TMFactory(factory).getMarketByCreatorLength(creator), 0, "test_Fuzz_UpdateMarketDetails::6");
+        assertEq(TMFactory(factory).getMarketByCreatorLength(creator), 0, "test_Fuzz_UpdateMarketDetails::7");
+
+        vm.warp(block.timestamp + 100);
 
         TMFactory(factory).updateMarketDetails(market, creator, feeRecipient);
 
         details = TMFactory(factory).getMarketDetails(market);
 
-        assertEq(details.initialized, true, "test_Fuzz_UpdateMarketDetails::7");
-        assertEq(details.creator, creator, "test_Fuzz_UpdateMarketDetails::8");
-        assertEq(details.feeRecipient, feeRecipient, "test_Fuzz_UpdateMarketDetails::9");
+        assertEq(details.initialized, true, "test_Fuzz_UpdateMarketDetails::8");
+        assertEq(details.lastFeeRecipientUpdate, block.timestamp, "test_Fuzz_UpdateMarketDetails::9");
+        assertEq(details.creator, creator, "test_Fuzz_UpdateMarketDetails::10");
+        assertEq(details.feeRecipient, feeRecipient, "test_Fuzz_UpdateMarketDetails::11");
 
-        assertEq(TMFactory(factory).getMarketByCreatorLength(address(this)), 0, "test_Fuzz_UpdateMarketDetails::10");
-        assertEq(TMFactory(factory).getMarketByCreatorLength(creator), 1, "test_Fuzz_UpdateMarketDetails::11");
-        assertEq(TMFactory(factory).getMarketByCreatorAt(creator, 0), market, "test_Fuzz_UpdateMarketDetails::12");
+        assertEq(TMFactory(factory).getMarketByCreatorLength(address(this)), 0, "test_Fuzz_UpdateMarketDetails::12");
+        assertEq(TMFactory(factory).getMarketByCreatorLength(creator), 1, "test_Fuzz_UpdateMarketDetails::13");
+        assertEq(TMFactory(factory).getMarketByCreatorAt(creator, 0), market, "test_Fuzz_UpdateMarketDetails::14");
+
+        unchecked {
+            vm.startPrank(creator);
+
+            address newFeeRecipient = address(uint160(feeRecipient) + 1);
+
+            vm.expectRevert(abi.encodeWithSelector(ITMFactory.MinUpdateTimeNotPassed.selector, block.timestamp + 100));
+            TMFactory(factory).updateMarketDetails(market, creator, newFeeRecipient);
+
+            vm.warp(block.timestamp + 99);
+            vm.expectRevert(abi.encodeWithSelector(ITMFactory.MinUpdateTimeNotPassed.selector, block.timestamp + 1));
+            TMFactory(factory).updateMarketDetails(market, creator, newFeeRecipient);
+
+            vm.warp(block.timestamp + 1);
+            TMFactory(factory).updateMarketDetails(market, creator, newFeeRecipient);
+
+            vm.stopPrank();
+
+            details = TMFactory(factory).getMarketDetails(market);
+
+            assertEq(details.initialized, true, "test_Fuzz_UpdateMarketDetails::15");
+            assertEq(details.lastFeeRecipientUpdate, block.timestamp, "test_Fuzz_UpdateMarketDetails::16");
+            assertEq(details.creator, creator, "test_Fuzz_UpdateMarketDetails::17");
+            assertEq(details.feeRecipient, newFeeRecipient, "test_Fuzz_UpdateMarketDetails::18");
+        }
     }
 
     function test_Fuzz_Revert_UpdateMarketDetails(address caller, address market) public {
