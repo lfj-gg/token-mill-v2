@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 contract Parameters {
     uint256 internal immutable defaultProtocolFeeShare = 0.2e6; // 20%
+    uint256 internal immutable defaultMinUpdateTime = 1 hours;
     uint256 internal immutable defaultFee = 0.01e6; // 1%
     uint256 internal immutable sqrtPrice0 = _sqrtX96(0.000_000_028e18); // 2.8e-8
     uint256 internal immutable sqrtPrice1 = _sqrtX96(0.000_000_38e18); // 3.8e-7

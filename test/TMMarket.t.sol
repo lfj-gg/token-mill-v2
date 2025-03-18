@@ -29,7 +29,14 @@ contract TestTMMarket is Test, Parameters {
         marketImplementation = address(new TMMarket(factoryAddress, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
 
         factory = address(
-            new TMFactory(defaultProtocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin)
+            new TMFactory(
+                defaultMinUpdateTime,
+                defaultProtocolFeeShare,
+                defaultFee,
+                marketImplementation,
+                tokenImplementation,
+                admin
+            )
         );
 
         vm.prank(admin);

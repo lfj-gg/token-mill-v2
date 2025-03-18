@@ -10,6 +10,8 @@ interface ITMFactory {
     error QuoteTokenNotSupported();
     error MarketImplementationNotSet();
     error TokenImplementationNotSet();
+    error MinUpdateTimeNotPassed(uint256 nextUpdateTime);
+    error InvalidMinUpdateTime();
 
     event MarketCreated(
         address indexed creator, address indexed quoteToken, address market, address token, string name, string symbol
@@ -24,15 +26,18 @@ interface ITMFactory {
     event FeeReceived(
         address indexed market, address indexed token, address indexed feeRecipient, uint256 fee, uint256 protocolFee
     );
+    event MinUpdateTimeSet(address indexed sender, uint256 minUpdateTime);
 
     struct MarketDetails {
         bool initialized;
+        uint88 lastFeeRecipientUpdate;
         address feeRecipient;
         address creator;
     }
 
     function initialize(
         uint256 protocolFeeShare,
+        uint256 minUpdateTime,
         uint256 defaultFee,
         address marketImplementation,
         address tokenImplementation,
@@ -50,6 +55,8 @@ interface ITMFactory {
     function getMarketImplementation() external view returns (address);
 
     function getTokenImplementation() external view returns (address);
+
+    function getMinUpdateTime() external view returns (uint256);
 
     function getProtocolFeeShare() external view returns (uint256);
 
@@ -84,6 +91,8 @@ interface ITMFactory {
     function collect(address token, address account, address recipient, uint256 amount) external returns (bool);
 
     function updateMarketDetails(address market, address creator, address feeRecipient) external returns (bool);
+
+    function setMinUpdateTime(uint256 minUpdateTime) external returns (bool);
 
     function setProtocolFeeShare(uint256 protocolFeeShare) external returns (bool);
 

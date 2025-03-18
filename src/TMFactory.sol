@@ -38,6 +38,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     address private _marketImplementation;
     address private _tokenImplementation;
 
+    uint88 private _minUpdateTime;
     uint64 private _protocolFeeShare;
     uint64 private _defaultFee;
 
@@ -51,24 +52,26 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     mapping(address creator => EnumerableSet.AddressSet) private _marketsByCreator;
 
     /**
-     * @dev Sets the initial values for {protocolFeeShare}, {defaultFee}, {marketImplementation}, {tokenImplementation}
-     * and {admin}.
+     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {marketImplementation},
+     * {tokenImplementation} and {admin}.
      */
     constructor(
+        uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
         address marketImplementation,
         address tokenImplementation,
         address admin
     ) {
-        initialize(protocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin);
+        initialize(minUpdateTime, protocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin);
     }
 
     /**
-     * @dev Initializes the contract with {protocolFeeShare}, {defaultFee}, {marketImplementation}, {tokenImplementation}
-     * and {admin}.
+     * @dev Initializes the contract with {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {marketImplementation},
+     * {tokenImplementation} and {admin}.
      */
     function initialize(
+        uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
         address marketImplementation,
@@ -78,6 +81,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
 
+        _setMinUpdateTime(minUpdateTime);
         _setProtocolFeeShare(protocolFeeShare);
         _setDefaultFee(defaultFee);
 
@@ -104,6 +108,13 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      */
     function getTokenImplementation() external view override returns (address) {
         return _tokenImplementation;
+    }
+
+    /**
+     * @dev Returns the minimum time between fee recipient updates.
+     */
+    function getMinUpdateTime() external view override returns (uint256) {
+        return _minUpdateTime;
     }
 
     /**
@@ -222,7 +233,12 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _tokens.push(token);
         _markets.push(market);
 
-        _details[market] = MarketDetails({initialized: true, creator: msg.sender, feeRecipient: KOTM_FEE_RECIPIENT()});
+        _details[market] = MarketDetails({
+            initialized: true,
+            lastFeeRecipientUpdate: uint88(block.timestamp),
+            creator: msg.sender,
+            feeRecipient: KOTM_FEE_RECIPIENT()
+        });
         _marketsByCreator[msg.sender].add(market);
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
@@ -289,12 +305,32 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         if (details.creator != msg.sender) revert Unauthorized();
 
         details.creator = creator;
-        details.feeRecipient = feeRecipient;
+
+        if (feeRecipient != details.feeRecipient) {
+            uint256 nextUpdateTime = uint256(details.lastFeeRecipientUpdate) + _minUpdateTime;
+            if (nextUpdateTime > block.timestamp) revert MinUpdateTimeNotPassed(nextUpdateTime);
+
+            details.lastFeeRecipientUpdate = uint88(block.timestamp);
+            details.feeRecipient = feeRecipient;
+        }
 
         _marketsByCreator[msg.sender].remove(market);
         _marketsByCreator[creator].add(market);
 
         emit MarketDetailsUpdated(market, creator, feeRecipient);
+        return true;
+    }
+
+    /**
+     * @dev Updates the minimum time between fee recipient updates.
+     * Emits a {MinUpdateTimeSet} event with the sender and the {minUpdateTime}.
+     *
+     * Requirements:
+     *
+     * - The caller must have the DEFAULT_ADMIN_ROLE.
+     */
+    function setMinUpdateTime(uint256 minUpdateTime) external override onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+        _setMinUpdateTime(minUpdateTime);
         return true;
     }
 
@@ -443,6 +479,18 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
         ITMToken(token).initialize(name, symbol);
         ITMMarket(market).initialize(token, quoteToken, _defaultFee);
+    }
+
+    /**
+     * @dev Helper function to set the {minUpdateTime}.
+     * Emits a {MinUpdateTimeSet} event with the sender and the {minUpdateTime}.
+     */
+    function _setMinUpdateTime(uint256 minUpdateTime) internal {
+        if (minUpdateTime >= 2 ** 88) revert InvalidMinUpdateTime();
+
+        _minUpdateTime = uint88(minUpdateTime);
+
+        emit MinUpdateTimeSet(msg.sender, minUpdateTime);
     }
 
     /**

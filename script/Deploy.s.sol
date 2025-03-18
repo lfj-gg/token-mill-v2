@@ -28,7 +28,7 @@ contract Deploy is Script, Parameters {
         vm.startPrank(deployer);
         tokenImplementation = address(new TMToken(factoryProxyAddress));
         marketImplementation = address(new TMMarket(factoryProxyAddress, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
-        factoryImplementation = address(new TMFactory(0, 0, address(0), address(0), address(0)));
+        factoryImplementation = address(new TMFactory(0, 0, 0, address(0), address(0), address(0)));
 
         factoryProxy = address(
             new TransparentUpgradeableProxy(
@@ -36,7 +36,14 @@ contract Deploy is Script, Parameters {
                 deployer,
                 abi.encodeCall(
                     ITMFactory.initialize,
-                    (defaultProtocolFeeShare, defaultFee, marketImplementation, tokenImplementation, deployer)
+                    (
+                        defaultMinUpdateTime,
+                        defaultProtocolFeeShare,
+                        defaultFee,
+                        marketImplementation,
+                        tokenImplementation,
+                        deployer
+                    )
                 )
             )
         );
