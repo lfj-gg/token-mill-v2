@@ -6,12 +6,12 @@ interface ITMFactory {
     error InsufficientFunds();
     error InvalidMarket();
     error InvalidFee();
-    error QuoteTokenAlreadySupported();
     error QuoteTokenNotSupported();
     error MarketImplementationNotSet();
     error TokenImplementationNotSet();
     error MinUpdateTimeNotPassed(uint256 nextUpdateTime);
     error InvalidMinUpdateTime();
+    error MismatchedQuoteToken();
 
     event MarketCreated(
         address indexed creator, address indexed quoteToken, address market, address token, string name, string symbol
@@ -20,8 +20,7 @@ interface ITMFactory {
     event MarketDetailsUpdated(address indexed market, address indexed creator, address indexed feeRecipient);
     event ProtocolFeeShareSet(address indexed sender, uint256 protocolFeeShare);
     event DefaultFeeSet(address indexed sender, uint256 defaultFee);
-    event QuoteTokenSet(address indexed sender, address quoteToken, bool supported);
-    event MarketImplementationSet(address indexed sender, address marketImplementation);
+    event MarketImplementationSet(address indexed sender, address indexed quoteToken, address marketImplementation);
     event TokenImplementationSet(address indexed sender, address tokenImplementation);
     event FeeReceived(
         address indexed market, address indexed token, address indexed feeRecipient, uint256 fee, uint256 protocolFee
@@ -39,6 +38,7 @@ interface ITMFactory {
         uint256 protocolFeeShare,
         uint256 minUpdateTime,
         uint256 defaultFee,
+        address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
@@ -52,7 +52,7 @@ interface ITMFactory {
 
     function PROTOCOL_FEE_COLLECTOR_ROLE() external view returns (bytes32);
 
-    function getMarketImplementation() external view returns (address);
+    function getMarketImplementation(address quoteToken) external view returns (address);
 
     function getTokenImplementation() external view returns (address);
 
@@ -98,9 +98,7 @@ interface ITMFactory {
 
     function setDefaultFee(uint256 defaultFee) external returns (bool);
 
-    function setQuoteToken(address quoteToken, bool supported) external returns (bool);
-
-    function setMarketImplementation(address marketImplementation) external returns (bool);
+    function setMarketImplementation(address quoteToken, address marketImplementation) external returns (bool);
 
     function setTokenImplementation(address tokenImplementation) external returns (bool);
 

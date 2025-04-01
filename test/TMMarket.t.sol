@@ -15,32 +15,30 @@ contract TestTMMarket is Test, Parameters {
     address factory;
     address market;
     address token;
-    address quoteToken;
 
     address admin = makeAddr("admin");
 
-    bytes32 constant PRICE_SLOT = bytes32(uint256(2));
+    bytes32 constant PRICE_SLOT = bytes32(uint256(1));
 
     function setUp() public {
         quoteToken = address(new MockERC20());
         address factoryAddress = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 2);
 
         tokenImplementation = address(new TMToken(factoryAddress));
-        marketImplementation = address(new TMMarket(factoryAddress, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
+        marketImplementation =
+            address(new TMMarket(factoryAddress, quoteToken, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
 
         factory = address(
             new TMFactory(
                 defaultMinUpdateTime,
                 defaultProtocolFeeShare,
                 defaultFee,
+                quoteToken,
                 marketImplementation,
                 tokenImplementation,
                 admin
             )
         );
-
-        vm.prank(admin);
-        ITMFactory(factory).setQuoteToken(quoteToken, true);
 
         (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
     }
@@ -70,17 +68,18 @@ contract TestTMMarket is Test, Parameters {
         public
     {
         vm.expectRevert(ITMMarket.InvalidRatiosOrder.selector);
-        new TMMarket(factory, 0, 0, sqrtPriceA, bound(sqrtPriceB, 0, sqrtPriceA));
+        new TMMarket(factory, address(0), 0, 0, sqrtPriceA, bound(sqrtPriceB, 0, sqrtPriceA));
 
         vm.expectRevert(ITMMarket.InvalidRatios.selector);
-        new TMMarket(factory, 0, 0, 0, 1);
+        new TMMarket(factory, address(0), 0, 0, 0, 1);
 
         vm.expectRevert(ITMMarket.InvalidRatios.selector);
-        new TMMarket(factory, 0, 0, 1, bound(sqrtPriceB, 2 ** 128, type(uint256).max));
+        new TMMarket(factory, address(0), 0, 0, 1, bound(sqrtPriceB, 2 ** 128, type(uint256).max));
 
         vm.expectRevert(Math.Uint127Overflow.selector);
         new TMMarket(
             factory,
+            address(0),
             amountA,
             bound(amountB, amountA > 2 ** 127 ? 0 : 2 ** 127 - amountA, type(uint256).max - amountA),
             2 ** 96,
@@ -88,13 +87,13 @@ contract TestTMMarket is Test, Parameters {
         );
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 0, 1, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 0, 1, 2 ** 96, 2 ** 96 + 1);
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 1, 0, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 1, 0, 2 ** 96, 2 ** 96 + 1);
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 0, 0, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 0, 0, 2 ** 96, 2 ** 96 + 1);
 
         sqrtPriceA = 2 ** 96;
         sqrtPriceB = bound(sqrtPriceB, sqrtPriceA + 1, 2 ** 127 - 1);
@@ -102,26 +101,26 @@ contract TestTMMarket is Test, Parameters {
         uint256 minAmountToOverflow = Math.divUp(2 ** 127 * (sqrtPriceB - sqrtPriceA), sqrtPriceB);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
-        new TMMarket(factory, bound(amountA, minAmountToOverflow, 2 ** 127), 1, sqrtPriceA, sqrtPriceB);
+        new TMMarket(factory, address(0), bound(amountA, minAmountToOverflow, 2 ** 127), 1, sqrtPriceA, sqrtPriceB);
 
         sqrtPriceB = 2 ** 96 + 1;
         minAmountToOverflow = Math.divUp(2 ** 127 * (2 ** 128 - 1 - sqrtPriceB), 2 ** 128 - 1);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
-        new TMMarket(factory, 1, bound(amountB, minAmountToOverflow, 2 ** 127), sqrtPriceA, sqrtPriceB);
+        new TMMarket(factory, address(0), 1, bound(amountB, minAmountToOverflow, 2 ** 127), sqrtPriceA, sqrtPriceB);
     }
 
     function test_Revert_Initialize() public {
         vm.expectRevert(ITMMarket.AlreadyInitialized.selector);
-        ITMMarket(market).initialize(address(0), address(0), 0);
+        ITMMarket(market).initialize(address(0), 0);
 
         vm.store(market, PRICE_SLOT, 0);
 
         vm.expectRevert(ITMMarket.SameTokens.selector);
-        ITMMarket(market).initialize(address(1), address(1), 0);
+        ITMMarket(market).initialize(quoteToken, 0);
 
         vm.expectRevert(ITMMarket.InvalidFee.selector);
-        ITMMarket(market).initialize(address(1), address(2), SwapMath.MAX_FEE + 1);
+        ITMMarket(market).initialize(address(1), SwapMath.MAX_FEE + 1);
     }
 
     function test_revert_GetDeltaAmountsAndSwap() public {
