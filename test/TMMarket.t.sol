@@ -43,6 +43,68 @@ contract TestTMMarket is Test, Parameters {
         (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
     }
 
+    function test_Fuzz_TargetRatio(uint256 currentSqrtRatioX96, bool zeroForOne, uint256 sqrtRatioLimitX96)
+        public
+        view
+    {
+        (uint256 liquidityA, uint256 liquidityB) = ITMMarket(market).getLiquidities();
+        (uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 sqrtRatioCX96) = ITMMarket(market).getSqrtRatiosBounds();
+
+        currentSqrtRatioX96 = zeroForOne
+            ? bound(currentSqrtRatioX96, sqrtRatioAX96 + 1, sqrtRatioCX96)
+            : bound(currentSqrtRatioX96, sqrtRatioAX96, sqrtRatioCX96 - 1);
+        sqrtRatioLimitX96 = zeroForOne
+            ? bound(sqrtRatioLimitX96, sqrtRatioAX96, currentSqrtRatioX96 - 1)
+            : bound(sqrtRatioLimitX96, currentSqrtRatioX96 + 1, sqrtRatioCX96);
+
+        uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
+        uint256 targetRatioX96 = (
+            zeroForOne
+                ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                : (currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+        ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
+
+        if (currentSqrtRatioX96 >= sqrtRatioBX96) {
+            assertEq(liquidity, liquidityB, "test_Fuzz_TargetRatio::1");
+            assertLe(targetRatioX96, sqrtRatioCX96, "test_Fuzz_TargetRatio::2");
+            assertGe(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::3");
+
+            if (zeroForOne) {
+                if (sqrtRatioLimitX96 >= sqrtRatioBX96) {
+                    assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::4");
+                } else {
+                    assertEq(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::5");
+                }
+            } else {
+                assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::6");
+            }
+        } else {
+            assertEq(liquidity, liquidityA, "test_Fuzz_TargetRatio::7");
+            assertLe(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::8");
+            assertGe(targetRatioX96, sqrtRatioAX96, "test_Fuzz_TargetRatio::9");
+
+            if (zeroForOne) {
+                assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::10");
+            } else {
+                if (sqrtRatioLimitX96 >= sqrtRatioBX96) {
+                    assertEq(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::11");
+                } else {
+                    assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::12");
+                }
+            }
+        }
+
+        if (targetRatioX96 != sqrtRatioLimitX96) {
+            if (zeroForOne) {
+                assertLe(sqrtRatioLimitX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::13");
+                assertGe(sqrtRatioLimitX96, sqrtRatioAX96, "test_Fuzz_TargetRatio::14");
+            } else {
+                assertLe(sqrtRatioLimitX96, sqrtRatioCX96, "test_Fuzz_TargetRatio::15");
+                assertGe(sqrtRatioLimitX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::16");
+            }
+        }
+    }
+
     function test_Constructor() public view {
         assertEq(ITMMarket(market).getFactory(), factory, "test_Constructor::1");
         (uint256 sqrtPriceA_, uint256 sqrtPriceB_, uint256 sqrtPriceC_) = ITMMarket(market).getSqrtRatiosBounds();
