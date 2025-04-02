@@ -61,7 +61,7 @@ contract TestTMMarket is Test, Parameters {
         uint256 targetRatioX96 = (
             zeroForOne
                 ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
-                : (currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+                : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96
         ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
 
         if (currentSqrtRatioX96 >= sqrtRatioBX96) {
