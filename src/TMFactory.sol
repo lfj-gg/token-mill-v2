@@ -35,7 +35,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     address public constant override PROTOCOL_FEE_RECIPIENT = address(0);
     bytes32 public constant override PROTOCOL_FEE_COLLECTOR_ROLE = keccak256("PROTOCOL_FEE_COLLECTOR_ROLE");
 
-    address private _marketImplementation;
+    mapping(address quoteToken => address marketImplementation) private _marketImplementations;
     address private _tokenImplementation;
 
     uint88 private _minUpdateTime;
@@ -52,18 +52,21 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     mapping(address creator => EnumerableSet.AddressSet) private _marketsByCreator;
 
     /**
-     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {marketImplementation},
+     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {quoteToken} to {marketImplementation},
      * {tokenImplementation} and {admin}.
      */
     constructor(
         uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
+        address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
     ) {
-        initialize(minUpdateTime, protocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin);
+        initialize(
+            minUpdateTime, protocolFeeShare, defaultFee, quoteToken, marketImplementation, tokenImplementation, admin
+        );
     }
 
     /**
@@ -74,6 +77,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
+        address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
@@ -85,7 +89,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _setProtocolFeeShare(protocolFeeShare);
         _setDefaultFee(defaultFee);
 
-        _setMarketImplementation(marketImplementation);
+        _setMarketImplementation(quoteToken, marketImplementation);
         _setTokenImplementation(tokenImplementation);
     }
 
@@ -99,8 +103,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     /**
      * @dev Returns the market implementation address.
      */
-    function getMarketImplementation() external view override returns (address) {
-        return _marketImplementation;
+    function getMarketImplementation(address quoteToken) external view override returns (address) {
+        return _marketImplementations[quoteToken];
     }
 
     /**
@@ -226,8 +230,6 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         override
         returns (address token, address market)
     {
-        if (!_quoteTokens.contains(quoteToken)) revert QuoteTokenNotSupported();
-
         (token, market) = _createMarket(name, symbol, quoteToken);
 
         _tokens.push(token);
@@ -367,45 +369,22 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Adds (if {supported} is true) or removes (if {supported} is false) the {quoteToken} from the supported quote tokens.
-     * Emits a {QuoteTokenSet} event with the sender, the {quoteToken} and wether it is supported or not.
-     *
-     * Requirements:
-     *
-     * - The {quoteToken} must not be already supported if {supported} is true
-     * - The {quoteToken} must be supported if {supported} is false
-     * - The caller must have the DEFAULT_ADMIN_ROLE.
-     */
-    function setQuoteToken(address quoteToken, bool supported)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        returns (bool)
-    {
-        if (supported) {
-            if (!_quoteTokens.add(quoteToken)) revert QuoteTokenAlreadySupported();
-        } else {
-            if (!_quoteTokens.remove(quoteToken)) revert QuoteTokenNotSupported();
-        }
-        emit QuoteTokenSet(msg.sender, quoteToken, supported);
-        return true;
-    }
-
-    /**
-     * @dev Updates the {marketImplementation} that will be used by newly created markets.
+     * @dev Updates the {marketImplementation} that will be used by newly created markets for the {quoteToken}
+     * of the {marketImplementation}. Registering a new market implementation overrides the previous one for
+     * the same {quoteToken}.
      * Emits a {MarketImplementationSet} event with the sender and the {marketImplementation}.
      *
      * Requirements:
      *
      * - The caller must have the DEFAULT_ADMIN_ROLE.
      */
-    function setMarketImplementation(address marketImplementation)
+    function setMarketImplementation(address quoteToken, address marketImplementation)
         external
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
         returns (bool)
     {
-        _setMarketImplementation(marketImplementation);
+        _setMarketImplementation(quoteToken, marketImplementation);
         return true;
     }
 
@@ -466,10 +445,10 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         internal
         returns (address token, address market)
     {
-        address marketImplementation = _marketImplementation;
+        address marketImplementation = _marketImplementations[quoteToken];
         address tokenImplementation = _tokenImplementation;
 
-        if (marketImplementation == address(0)) revert MarketImplementationNotSet();
+        if (marketImplementation == address(0)) revert QuoteTokenNotSupported();
         if (tokenImplementation == address(0)) revert TokenImplementationNotSet();
 
         token = Clones.clone(_tokenImplementation);
@@ -478,7 +457,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _marketOf[token] = market;
 
         ITMToken(token).initialize(name, symbol);
-        ITMMarket(market).initialize(token, quoteToken, _defaultFee);
+        ITMMarket(market).initialize(token, _defaultFee);
     }
 
     /**
@@ -526,13 +505,27 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Helper function to set the {marketImplementation}.
+     * @dev Helper function to set the {marketImplementation} for the {quoteToken}.
+     * If the {marketImplementation} is set to address(0), the {quoteToken} will be removed from the list of
+     * supported quote tokens. Otherwise, the {quoteToken} will be added to the list of supported quote tokens.
      * Emits a {MarketImplementationSet} event with the sender and the {marketImplementation}.
+     *
+     * Requirements:
+     *
+     * - The {marketImplementation} must be a valid market implementation.
      */
-    function _setMarketImplementation(address marketImplementation) internal {
-        _marketImplementation = marketImplementation;
+    function _setMarketImplementation(address quoteToken, address marketImplementation) internal {
+        if (marketImplementation == address(0)) {
+            _quoteTokens.remove(quoteToken);
+        } else {
+            if (ITMMarket(marketImplementation).getQuoteToken() != quoteToken) revert MismatchedQuoteToken();
 
-        emit MarketImplementationSet(msg.sender, marketImplementation);
+            _quoteTokens.add(quoteToken);
+        }
+
+        _marketImplementations[quoteToken] = marketImplementation;
+
+        emit MarketImplementationSet(msg.sender, quoteToken, marketImplementation);
     }
 
     /**

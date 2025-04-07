@@ -25,7 +25,7 @@ interface ITMMarket {
         uint256 sqrtRatioX96
     );
 
-    function initialize(address token0, address token1, uint256 fee) external returns (bool);
+    function initialize(address token0, uint256 fee) external returns (bool);
 
     function getFactory() external view returns (address);
 
