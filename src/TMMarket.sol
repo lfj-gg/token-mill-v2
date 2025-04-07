@@ -26,6 +26,7 @@ contract TMMarket is ITMMarket {
     using SafeERC20 for IERC20;
 
     address private immutable factory;
+    address private immutable quoteToken; // Quote token
     uint256 private immutable liquidityA; // Liquidity before graduation
     uint256 private immutable liquidityB; // Liquidity after graduation
     uint256 private immutable sqrtRatioAX96; // Start price, calculated as sqrt((price0 * 10^decimals1) / (price1 * 10^decimals0)) * 2^96
@@ -34,7 +35,6 @@ contract TMMarket is ITMMarket {
     uint256 private immutable maxSupply;
 
     address private _token0; // Base token
-    address private _token1; // Quote token
 
     uint128 private _sqrtRatioX96; // Current price
     uint64 private _fee;
@@ -51,7 +51,7 @@ contract TMMarket is ITMMarket {
     }
 
     /**
-     * @dev Sets the immutable values for {factory}, {liquidityA}, {liquidityB}, {sqrtRatioAX96}, {sqrtRatioBX96} and {maxSupply}.
+     * @dev Sets the immutable values for {factory}, {quoteToken}, {liquidityA}, {liquidityB}, {sqrtRatioAX96}, {sqrtRatioBX96} and {maxSupply}.
      * The ratios must have been calculated correctly accounting for the decimals of each token, the formula is:
      * `sqrt((price0 * 10^decimals1) / (price1 * 10^decimals0)) * 2^96`.
      * The liquidityA and liquidityB parameters are the liquidity of the two xyk pools before and after the graduation price.
@@ -66,11 +66,19 @@ contract TMMarket is ITMMarket {
      * - The sum of `amount0A` and `amount0B` must fit into 127 bits
      * - The liquidityA and liquidityB must be greater than 0 and fit into 127 bits
      */
-    constructor(address factory_, uint256 amount0A, uint256 amount0B, uint256 sqrtRatioAX96_, uint256 sqrtRatioBX96_) {
+    constructor(
+        address factory_,
+        address quoteToken_,
+        uint256 amount0A,
+        uint256 amount0B,
+        uint256 sqrtRatioAX96_,
+        uint256 sqrtRatioBX96_
+    ) {
         if (sqrtRatioAX96_ >= sqrtRatioBX96_) revert InvalidRatiosOrder();
         if (sqrtRatioAX96_ == 0 || sqrtRatioBX96_ > sqrtRatioMaxX96) revert InvalidRatios();
 
         factory = factory_;
+        quoteToken = quoteToken_;
         sqrtRatioAX96 = sqrtRatioAX96_;
         sqrtRatioBX96 = sqrtRatioBX96_;
         maxSupply = Math.safeUint127(amount0A + amount0B);
@@ -87,7 +95,7 @@ contract TMMarket is ITMMarket {
     }
 
     /**
-     * @dev Initializes the contract with {token0_}, {token1_} and {fee_}.
+     * @dev Initializes the contract with {token0_}, and {fee_}.
      * The fee must be less than or equal to SwapMath.MAX_FEE.
      * The market will mint the maximum supply of token0 and set the reserve0 to the maximum supply.
      *
@@ -97,18 +105,17 @@ contract TMMarket is ITMMarket {
      * - The tokens must be different
      * - The fee must be less than or equal to SwapMath.MAX_FEE
      */
-    function initialize(address token0_, address token1_, uint256 fee_) external override returns (bool) {
+    function initialize(address token, uint256 fee_) external override returns (bool) {
         if (_sqrtRatioX96 != 0) revert AlreadyInitialized();
-        if (token0_ == token1_) revert SameTokens();
+        if (token == quoteToken) revert SameTokens();
         if (fee_ > SwapMath.MAX_FEE) revert InvalidFee();
 
-        _token0 = token0_;
-        _token1 = token1_;
+        _token0 = token;
 
         _sqrtRatioX96 = uint128(sqrtRatioAX96);
         _fee = uint64(fee_);
 
-        ITMToken(token0_).mint(address(this), maxSupply);
+        ITMToken(token).mint(address(this), maxSupply);
         _reserve0 = uint128(maxSupply);
 
         return true;
@@ -148,7 +155,7 @@ contract TMMarket is ITMMarket {
      * @dev Returns the quote token of the market.
      */
     function getQuoteToken() external view override returns (address) {
-        return _token1;
+        return quoteToken;
     }
 
     /**
@@ -229,7 +236,7 @@ contract TMMarket is ITMMarket {
         (uint256 nextSqrtRatioX96, uint256 amountIn, uint256 amountOut, uint256 feeAmountIn) =
             _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
 
-        address token1 = _token1;
+        address token1 = quoteToken;
         uint256 reserve0 = _reserve0;
         uint256 reserve1 = _reserve1;
 
@@ -302,8 +309,11 @@ contract TMMarket is ITMMarket {
         // First pool
         {
             uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
-            uint256 targetRatioX96 =
-                currentSqrtRatioX96 >= sqrtRatioBX96 == zeroForOne ? sqrtRatioBX96 : sqrtRatioLimitX96;
+            uint256 targetRatioX96 = (
+                zeroForOne
+                    ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                    : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96
+            ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
 
             (nextSqrtRatioX96, amountIn, amountOut, feeAmountIn) =
                 SwapMath.getDeltaAmounts(currentSqrtRatioX96, targetRatioX96, liquidity, deltaAmount, fee);

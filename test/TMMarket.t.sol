@@ -15,27 +15,94 @@ contract TestTMMarket is Test, Parameters {
     address factory;
     address market;
     address token;
-    address quoteToken;
 
     address admin = makeAddr("admin");
 
-    bytes32 constant PRICE_SLOT = bytes32(uint256(2));
+    bytes32 constant PRICE_SLOT = bytes32(uint256(1));
 
     function setUp() public {
         quoteToken = address(new MockERC20());
         address factoryAddress = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 2);
 
         tokenImplementation = address(new TMToken(factoryAddress));
-        marketImplementation = address(new TMMarket(factoryAddress, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
+        marketImplementation =
+            address(new TMMarket(factoryAddress, quoteToken, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
 
         factory = address(
-            new TMFactory(defaultProtocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin)
+            new TMFactory(
+                defaultMinUpdateTime,
+                defaultProtocolFeeShare,
+                defaultFee,
+                quoteToken,
+                marketImplementation,
+                tokenImplementation,
+                admin
+            )
         );
 
-        vm.prank(admin);
-        ITMFactory(factory).setQuoteToken(quoteToken, true);
-
         (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
+    }
+
+    function test_Fuzz_TargetRatio(uint256 currentSqrtRatioX96, bool zeroForOne, uint256 sqrtRatioLimitX96)
+        public
+        view
+    {
+        (uint256 liquidityA, uint256 liquidityB) = ITMMarket(market).getLiquidities();
+        (uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 sqrtRatioCX96) = ITMMarket(market).getSqrtRatiosBounds();
+
+        currentSqrtRatioX96 = zeroForOne
+            ? bound(currentSqrtRatioX96, sqrtRatioAX96 + 1, sqrtRatioCX96)
+            : bound(currentSqrtRatioX96, sqrtRatioAX96, sqrtRatioCX96 - 1);
+        sqrtRatioLimitX96 = zeroForOne
+            ? bound(sqrtRatioLimitX96, sqrtRatioAX96, currentSqrtRatioX96 - 1)
+            : bound(sqrtRatioLimitX96, currentSqrtRatioX96 + 1, sqrtRatioCX96);
+
+        uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
+        uint256 targetRatioX96 = (
+            zeroForOne
+                ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96
+        ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
+
+        if (currentSqrtRatioX96 >= sqrtRatioBX96) {
+            assertEq(liquidity, liquidityB, "test_Fuzz_TargetRatio::1");
+            assertLe(targetRatioX96, sqrtRatioCX96, "test_Fuzz_TargetRatio::2");
+            assertGe(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::3");
+
+            if (zeroForOne) {
+                if (sqrtRatioLimitX96 >= sqrtRatioBX96) {
+                    assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::4");
+                } else {
+                    assertEq(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::5");
+                }
+            } else {
+                assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::6");
+            }
+        } else {
+            assertEq(liquidity, liquidityA, "test_Fuzz_TargetRatio::7");
+            assertLe(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::8");
+            assertGe(targetRatioX96, sqrtRatioAX96, "test_Fuzz_TargetRatio::9");
+
+            if (zeroForOne) {
+                assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::10");
+            } else {
+                if (sqrtRatioLimitX96 >= sqrtRatioBX96) {
+                    assertEq(targetRatioX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::11");
+                } else {
+                    assertEq(targetRatioX96, sqrtRatioLimitX96, "test_Fuzz_TargetRatio::12");
+                }
+            }
+        }
+
+        if (targetRatioX96 != sqrtRatioLimitX96) {
+            if (zeroForOne) {
+                assertLe(sqrtRatioLimitX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::13");
+                assertGe(sqrtRatioLimitX96, sqrtRatioAX96, "test_Fuzz_TargetRatio::14");
+            } else {
+                assertLe(sqrtRatioLimitX96, sqrtRatioCX96, "test_Fuzz_TargetRatio::15");
+                assertGe(sqrtRatioLimitX96, sqrtRatioBX96, "test_Fuzz_TargetRatio::16");
+            }
+        }
     }
 
     function test_Constructor() public view {
@@ -63,17 +130,18 @@ contract TestTMMarket is Test, Parameters {
         public
     {
         vm.expectRevert(ITMMarket.InvalidRatiosOrder.selector);
-        new TMMarket(factory, 0, 0, sqrtPriceA, bound(sqrtPriceB, 0, sqrtPriceA));
+        new TMMarket(factory, address(0), 0, 0, sqrtPriceA, bound(sqrtPriceB, 0, sqrtPriceA));
 
         vm.expectRevert(ITMMarket.InvalidRatios.selector);
-        new TMMarket(factory, 0, 0, 0, 1);
+        new TMMarket(factory, address(0), 0, 0, 0, 1);
 
         vm.expectRevert(ITMMarket.InvalidRatios.selector);
-        new TMMarket(factory, 0, 0, 1, bound(sqrtPriceB, 2 ** 128, type(uint256).max));
+        new TMMarket(factory, address(0), 0, 0, 1, bound(sqrtPriceB, 2 ** 128, type(uint256).max));
 
         vm.expectRevert(Math.Uint127Overflow.selector);
         new TMMarket(
             factory,
+            address(0),
             amountA,
             bound(amountB, amountA > 2 ** 127 ? 0 : 2 ** 127 - amountA, type(uint256).max - amountA),
             2 ** 96,
@@ -81,13 +149,13 @@ contract TestTMMarket is Test, Parameters {
         );
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 0, 1, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 0, 1, 2 ** 96, 2 ** 96 + 1);
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 1, 0, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 1, 0, 2 ** 96, 2 ** 96 + 1);
 
         vm.expectRevert(ITMMarket.LiquiditiesZero.selector);
-        new TMMarket(factory, 0, 0, 2 ** 96, 2 ** 96 + 1);
+        new TMMarket(factory, address(0), 0, 0, 2 ** 96, 2 ** 96 + 1);
 
         sqrtPriceA = 2 ** 96;
         sqrtPriceB = bound(sqrtPriceB, sqrtPriceA + 1, 2 ** 127 - 1);
@@ -95,26 +163,26 @@ contract TestTMMarket is Test, Parameters {
         uint256 minAmountToOverflow = Math.divUp(2 ** 127 * (sqrtPriceB - sqrtPriceA), sqrtPriceB);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
-        new TMMarket(factory, bound(amountA, minAmountToOverflow, 2 ** 127), 1, sqrtPriceA, sqrtPriceB);
+        new TMMarket(factory, address(0), bound(amountA, minAmountToOverflow, 2 ** 127), 1, sqrtPriceA, sqrtPriceB);
 
         sqrtPriceB = 2 ** 96 + 1;
         minAmountToOverflow = Math.divUp(2 ** 127 * (2 ** 128 - 1 - sqrtPriceB), 2 ** 128 - 1);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
-        new TMMarket(factory, 1, bound(amountB, minAmountToOverflow, 2 ** 127), sqrtPriceA, sqrtPriceB);
+        new TMMarket(factory, address(0), 1, bound(amountB, minAmountToOverflow, 2 ** 127), sqrtPriceA, sqrtPriceB);
     }
 
     function test_Revert_Initialize() public {
         vm.expectRevert(ITMMarket.AlreadyInitialized.selector);
-        ITMMarket(market).initialize(address(0), address(0), 0);
+        ITMMarket(market).initialize(address(0), 0);
 
         vm.store(market, PRICE_SLOT, 0);
 
         vm.expectRevert(ITMMarket.SameTokens.selector);
-        ITMMarket(market).initialize(address(1), address(1), 0);
+        ITMMarket(market).initialize(quoteToken, 0);
 
         vm.expectRevert(ITMMarket.InvalidFee.selector);
-        ITMMarket(market).initialize(address(1), address(2), SwapMath.MAX_FEE + 1);
+        ITMMarket(market).initialize(address(1), SwapMath.MAX_FEE + 1);
     }
 
     function test_revert_GetDeltaAmountsAndSwap() public {

@@ -35,9 +35,10 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     address public constant override PROTOCOL_FEE_RECIPIENT = address(0);
     bytes32 public constant override PROTOCOL_FEE_COLLECTOR_ROLE = keccak256("PROTOCOL_FEE_COLLECTOR_ROLE");
 
-    address private _marketImplementation;
+    mapping(address quoteToken => address marketImplementation) private _marketImplementations;
     address private _tokenImplementation;
 
+    uint88 private _minUpdateTime;
     uint64 private _protocolFeeShare;
     uint64 private _defaultFee;
 
@@ -51,26 +52,32 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     mapping(address creator => EnumerableSet.AddressSet) private _marketsByCreator;
 
     /**
-     * @dev Sets the initial values for {protocolFeeShare}, {defaultFee}, {marketImplementation}, {tokenImplementation}
-     * and {admin}.
+     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {quoteToken} to {marketImplementation},
+     * {tokenImplementation} and {admin}.
      */
     constructor(
+        uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
+        address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
     ) {
-        initialize(protocolFeeShare, defaultFee, marketImplementation, tokenImplementation, admin);
+        initialize(
+            minUpdateTime, protocolFeeShare, defaultFee, quoteToken, marketImplementation, tokenImplementation, admin
+        );
     }
 
     /**
-     * @dev Initializes the contract with {protocolFeeShare}, {defaultFee}, {marketImplementation}, {tokenImplementation}
-     * and {admin}.
+     * @dev Initializes the contract with {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {marketImplementation},
+     * {tokenImplementation} and {admin}.
      */
     function initialize(
+        uint256 minUpdateTime,
         uint256 protocolFeeShare,
         uint256 defaultFee,
+        address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
@@ -78,10 +85,11 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
 
+        _setMinUpdateTime(minUpdateTime);
         _setProtocolFeeShare(protocolFeeShare);
         _setDefaultFee(defaultFee);
 
-        _setMarketImplementation(marketImplementation);
+        _setMarketImplementation(quoteToken, marketImplementation);
         _setTokenImplementation(tokenImplementation);
     }
 
@@ -95,8 +103,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     /**
      * @dev Returns the market implementation address.
      */
-    function getMarketImplementation() external view override returns (address) {
-        return _marketImplementation;
+    function getMarketImplementation(address quoteToken) external view override returns (address) {
+        return _marketImplementations[quoteToken];
     }
 
     /**
@@ -104,6 +112,13 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      */
     function getTokenImplementation() external view override returns (address) {
         return _tokenImplementation;
+    }
+
+    /**
+     * @dev Returns the minimum time between fee recipient updates.
+     */
+    function getMinUpdateTime() external view override returns (uint256) {
+        return _minUpdateTime;
     }
 
     /**
@@ -215,14 +230,17 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         override
         returns (address token, address market)
     {
-        if (!_quoteTokens.contains(quoteToken)) revert QuoteTokenNotSupported();
-
         (token, market) = _createMarket(name, symbol, quoteToken);
 
         _tokens.push(token);
         _markets.push(market);
 
-        _details[market] = MarketDetails({initialized: true, creator: msg.sender, feeRecipient: KOTM_FEE_RECIPIENT()});
+        _details[market] = MarketDetails({
+            initialized: true,
+            lastFeeRecipientUpdate: uint88(block.timestamp),
+            creator: msg.sender,
+            feeRecipient: KOTM_FEE_RECIPIENT()
+        });
         _marketsByCreator[msg.sender].add(market);
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
@@ -289,12 +307,32 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         if (details.creator != msg.sender) revert Unauthorized();
 
         details.creator = creator;
-        details.feeRecipient = feeRecipient;
+
+        if (feeRecipient != details.feeRecipient) {
+            uint256 nextUpdateTime = uint256(details.lastFeeRecipientUpdate) + _minUpdateTime;
+            if (nextUpdateTime > block.timestamp) revert MinUpdateTimeNotPassed(nextUpdateTime);
+
+            details.lastFeeRecipientUpdate = uint88(block.timestamp);
+            details.feeRecipient = feeRecipient;
+        }
 
         _marketsByCreator[msg.sender].remove(market);
         _marketsByCreator[creator].add(market);
 
         emit MarketDetailsUpdated(market, creator, feeRecipient);
+        return true;
+    }
+
+    /**
+     * @dev Updates the minimum time between fee recipient updates.
+     * Emits a {MinUpdateTimeSet} event with the sender and the {minUpdateTime}.
+     *
+     * Requirements:
+     *
+     * - The caller must have the DEFAULT_ADMIN_ROLE.
+     */
+    function setMinUpdateTime(uint256 minUpdateTime) external override onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+        _setMinUpdateTime(minUpdateTime);
         return true;
     }
 
@@ -331,45 +369,22 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Adds (if {supported} is true) or removes (if {supported} is false) the {quoteToken} from the supported quote tokens.
-     * Emits a {QuoteTokenSet} event with the sender, the {quoteToken} and wether it is supported or not.
-     *
-     * Requirements:
-     *
-     * - The {quoteToken} must not be already supported if {supported} is true
-     * - The {quoteToken} must be supported if {supported} is false
-     * - The caller must have the DEFAULT_ADMIN_ROLE.
-     */
-    function setQuoteToken(address quoteToken, bool supported)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        returns (bool)
-    {
-        if (supported) {
-            if (!_quoteTokens.add(quoteToken)) revert QuoteTokenAlreadySupported();
-        } else {
-            if (!_quoteTokens.remove(quoteToken)) revert QuoteTokenNotSupported();
-        }
-        emit QuoteTokenSet(msg.sender, quoteToken, supported);
-        return true;
-    }
-
-    /**
-     * @dev Updates the {marketImplementation} that will be used by newly created markets.
+     * @dev Updates the {marketImplementation} that will be used by newly created markets for the {quoteToken}
+     * of the {marketImplementation}. Registering a new market implementation overrides the previous one for
+     * the same {quoteToken}.
      * Emits a {MarketImplementationSet} event with the sender and the {marketImplementation}.
      *
      * Requirements:
      *
      * - The caller must have the DEFAULT_ADMIN_ROLE.
      */
-    function setMarketImplementation(address marketImplementation)
+    function setMarketImplementation(address quoteToken, address marketImplementation)
         external
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
         returns (bool)
     {
-        _setMarketImplementation(marketImplementation);
+        _setMarketImplementation(quoteToken, marketImplementation);
         return true;
     }
 
@@ -430,10 +445,10 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         internal
         returns (address token, address market)
     {
-        address marketImplementation = _marketImplementation;
+        address marketImplementation = _marketImplementations[quoteToken];
         address tokenImplementation = _tokenImplementation;
 
-        if (marketImplementation == address(0)) revert MarketImplementationNotSet();
+        if (marketImplementation == address(0)) revert QuoteTokenNotSupported();
         if (tokenImplementation == address(0)) revert TokenImplementationNotSet();
 
         token = Clones.clone(_tokenImplementation);
@@ -442,7 +457,19 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _marketOf[token] = market;
 
         ITMToken(token).initialize(name, symbol);
-        ITMMarket(market).initialize(token, quoteToken, _defaultFee);
+        ITMMarket(market).initialize(token, _defaultFee);
+    }
+
+    /**
+     * @dev Helper function to set the {minUpdateTime}.
+     * Emits a {MinUpdateTimeSet} event with the sender and the {minUpdateTime}.
+     */
+    function _setMinUpdateTime(uint256 minUpdateTime) internal {
+        if (minUpdateTime >= 2 ** 88) revert InvalidMinUpdateTime();
+
+        _minUpdateTime = uint88(minUpdateTime);
+
+        emit MinUpdateTimeSet(msg.sender, minUpdateTime);
     }
 
     /**
@@ -478,13 +505,27 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Helper function to set the {marketImplementation}.
+     * @dev Helper function to set the {marketImplementation} for the {quoteToken}.
+     * If the {marketImplementation} is set to address(0), the {quoteToken} will be removed from the list of
+     * supported quote tokens. Otherwise, the {quoteToken} will be added to the list of supported quote tokens.
      * Emits a {MarketImplementationSet} event with the sender and the {marketImplementation}.
+     *
+     * Requirements:
+     *
+     * - The {marketImplementation} must be a valid market implementation.
      */
-    function _setMarketImplementation(address marketImplementation) internal {
-        _marketImplementation = marketImplementation;
+    function _setMarketImplementation(address quoteToken, address marketImplementation) internal {
+        if (marketImplementation == address(0)) {
+            _quoteTokens.remove(quoteToken);
+        } else {
+            if (ITMMarket(marketImplementation).getQuoteToken() != quoteToken) revert MismatchedQuoteToken();
 
-        emit MarketImplementationSet(msg.sender, marketImplementation);
+            _quoteTokens.add(quoteToken);
+        }
+
+        _marketImplementations[quoteToken] = marketImplementation;
+
+        emit MarketImplementationSet(msg.sender, quoteToken, marketImplementation);
     }
 
     /**
