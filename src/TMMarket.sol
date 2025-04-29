@@ -211,7 +211,7 @@ contract TMMarket is ITMMarket {
      * @dev Swaps `deltaAmount` of token0 for token1 or vice versa.
      * If `zeroForOne` is true, the input is token0 and the output is token1.
      * If `zeroForOne` is false, the input is token1 and the output is token0.
-     * The `deltaAmount` defines wether the swap is an exact input or output swap.
+     * The `deltaAmount` defines whether the swap is an exact input or output swap.
      * The `sqrtRatioLimitX96` is the price limit in 32x96 format. If zero for one, the price cannot be less than this value after the swap.
      * If one for zero, the price cannot be greater than this value after the swap
      * The function will emit a `Swap` event with the details of the swap.

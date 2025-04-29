@@ -143,7 +143,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Returns wether the market is initialized, the fee recipient and the creator address of the {market}.
+     * @dev Returns whether the market is initialized, the fee recipient and the creator address of the {market}.
      */
     function getMarketDetails(address market) external view override returns (MarketDetails memory) {
         return _details[market];
