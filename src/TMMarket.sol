@@ -31,7 +31,7 @@ contract TMMarket is ITMMarket {
     uint256 private immutable liquidityB; // Liquidity after graduation
     uint256 private immutable sqrtRatioAX96; // Start price, calculated as sqrt((price0 * 10^decimals1) / (price1 * 10^decimals0)) * 2^96
     uint256 private immutable sqrtRatioBX96; // Graduation price, calculated in the same way as sqrtRatioAX96
-    uint256 private constant sqrtRatioMaxX96 = type(uint128).max; // Maximum price
+    uint256 private constant sqrtRatioMaxX96 = 2 ** 127 - 1; // Maximum price
     uint256 private immutable maxSupply;
 
     address private _token0; // Base token

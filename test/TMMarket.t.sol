@@ -110,10 +110,10 @@ contract TestTMMarket is Test, Parameters {
         (uint256 sqrtPriceA_, uint256 sqrtPriceB_, uint256 sqrtPriceC_) = ITMMarket(market).getSqrtRatiosBounds();
         assertEq(sqrtPriceA_, sqrtPrice0, "test_Constructor::2");
         assertEq(sqrtPriceB_, sqrtPrice1, "test_Constructor::3");
-        assertEq(sqrtPriceC_, 2 ** 128 - 1, "test_Constructor::4");
+        assertEq(sqrtPriceC_, 2 ** 127 - 1, "test_Constructor::4");
         (uint256 liquidityA, uint256 liquidityB) = ITMMarket(market).getLiquidities();
         assertEq(liquidityA, SwapMath.getLiquidity0(sqrtPrice0, sqrtPrice1, amount0A), "test_Constructor::5");
-        assertEq(liquidityB, SwapMath.getLiquidity0(sqrtPrice1, 2 ** 128 - 1, amount0B), "test_Constructor::6");
+        assertEq(liquidityB, SwapMath.getLiquidity0(sqrtPrice1, 2 ** 127 - 1, amount0B), "test_Constructor::6");
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Constructor::7");
         assertEq(ITMMarket(market).getQuoteToken(), quoteToken, "test_Constructor::8");
         assertEq(ITMMarket(market).getCurrentSqrtRatio(), sqrtPrice0, "test_Constructor::9");
@@ -136,7 +136,7 @@ contract TestTMMarket is Test, Parameters {
         new TMMarket(factory, address(0), 0, 0, 0, 1);
 
         vm.expectRevert(ITMMarket.InvalidRatios.selector);
-        new TMMarket(factory, address(0), 0, 0, 1, bound(sqrtPriceB, 2 ** 128, type(uint256).max));
+        new TMMarket(factory, address(0), 0, 0, 1, bound(sqrtPriceB, 2 ** 127, type(uint256).max));
 
         vm.expectRevert(Math.Uint127Overflow.selector);
         new TMMarket(
@@ -158,15 +158,16 @@ contract TestTMMarket is Test, Parameters {
         new TMMarket(factory, address(0), 0, 0, 2 ** 96, 2 ** 96 + 1);
 
         sqrtPriceA = 2 ** 96;
-        sqrtPriceB = bound(sqrtPriceB, sqrtPriceA + 1, 2 ** 127 - 1);
+        sqrtPriceB = bound(sqrtPriceB, sqrtPriceA + 1, 2 ** 126 - 1);
 
-        uint256 minAmountToOverflow = Math.divUp(2 ** 127 * (sqrtPriceB - sqrtPriceA), sqrtPriceB);
+        uint256 minAmountToOverflow =
+            Math.fullMulDivUp(2 ** 127, (sqrtPriceB - sqrtPriceA) << 96, sqrtPriceA * sqrtPriceB);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
         new TMMarket(factory, address(0), bound(amountA, minAmountToOverflow, 2 ** 127), 1, sqrtPriceA, sqrtPriceB);
 
         sqrtPriceB = 2 ** 96 + 1;
-        minAmountToOverflow = Math.divUp(2 ** 127 * (2 ** 128 - 1 - sqrtPriceB), 2 ** 128 - 1);
+        minAmountToOverflow = Math.divUp(2 ** 127 * (2 ** 127 - 1 - sqrtPriceB), 2 ** 127 - 1);
 
         vm.expectRevert(Math.Uint127Overflow.selector);
         new TMMarket(factory, address(0), 1, bound(amountB, minAmountToOverflow, 2 ** 127), sqrtPriceA, sqrtPriceB);
@@ -188,7 +189,7 @@ contract TestTMMarket is Test, Parameters {
     function test_revert_GetDeltaAmountsAndSwap() public {
         // Move Price away from the min price
         MockERC20(quoteToken).mint(market, 100e18);
-        ITMMarket(market).swap(address(0xdead), false, 100e18, 2 ** 128 - 1);
+        ITMMarket(market).swap(address(0xdead), false, 100e18, 2 ** 127 - 1);
 
         uint256 sqrtRatio = ITMMarket(market).getCurrentSqrtRatio();
 
@@ -211,9 +212,9 @@ contract TestTMMarket is Test, Parameters {
         ITMMarket(market).swap(address(1), false, 1, sqrtRatio - 1);
 
         vm.expectRevert(ITMMarket.InvalidSqrtRatioLimit.selector);
-        ITMMarket(market).getDeltaAmounts(false, 1, 2 ** 128);
+        ITMMarket(market).getDeltaAmounts(false, 1, 2 ** 127);
         vm.expectRevert(ITMMarket.InvalidSqrtRatioLimit.selector);
-        ITMMarket(market).swap(address(1), false, 1, 2 ** 128);
+        ITMMarket(market).swap(address(1), false, 1, 2 ** 127);
 
         vm.expectRevert(Math.Int128Overflow.selector);
         ITMMarket(market).getDeltaAmounts(false, 2 ** 127, sqrtRatio + 1);
@@ -244,9 +245,9 @@ contract TestTMMarket is Test, Parameters {
         ITMMarket(market).swap(address(1), true, 1, sqrtRatio + 1);
 
         vm.expectRevert(ITMMarket.InvalidSqrtRatioLimit.selector);
-        ITMMarket(market).getDeltaAmounts(true, 1, 2 ** 128);
+        ITMMarket(market).getDeltaAmounts(true, 1, 2 ** 127);
         vm.expectRevert(ITMMarket.InvalidSqrtRatioLimit.selector);
-        ITMMarket(market).swap(address(1), true, 1, 2 ** 128);
+        ITMMarket(market).swap(address(1), true, 1, 2 ** 127);
 
         vm.expectRevert(Math.Int128Overflow.selector);
         ITMMarket(market).getDeltaAmounts(true, 2 ** 127, sqrtRatio - 1);
@@ -261,37 +262,37 @@ contract TestTMMarket is Test, Parameters {
 
     function test_Fuzz_Swap_OneForZero_Gt0(uint256 before, uint256 amountA, uint256 amountB) public {
         {
-            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             before = bound(before, 1, uint256(maxAmount1) - 2);
 
             MockERC20(quoteToken).mint(market, before);
-            ITMMarket(market).swap(address(1), false, int256(before), 2 ** 128 - 1);
+            ITMMarket(market).swap(address(1), false, int256(before), 2 ** 127 - 1);
 
-            (, maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             amountA = bound(amountA, 1, uint256(maxAmount1) - 1);
             amountB = bound(amountB, 1, uint256(maxAmount1) - amountA);
         }
 
         uint256 snapshotId = vm.snapshotState();
 
-        (int256 amountA0, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, int256(amountA), 2 ** 128 - 1);
+        (int256 amountA0, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, int256(amountA), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, amountA);
             (int256 amountA0_, int256 amountA1_) =
-                ITMMarket(market).swap(address(1), false, int256(amountA), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, int256(amountA), 2 ** 127 - 1);
 
             assertEq(amountA0, amountA0_, "test_Fuzz_Swap_OneForZero_Gt0::1");
             assertEq(amountA1, amountA1_, "test_Fuzz_Swap_OneForZero_Gt0::2");
             assertEq(amountA1, int256(amountA), "test_Fuzz_Swap_OneForZero_Gt0::3");
         }
 
-        (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, int256(amountB), 2 ** 128 - 1);
+        (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, int256(amountB), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, amountB);
             (int256 amountB0_, int256 amountB1_) =
-                ITMMarket(market).swap(address(1), false, int256(amountB), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, int256(amountB), 2 ** 127 - 1);
 
             assertEq(amountB0, amountB0_, "test_Fuzz_Swap_OneForZero_Gt0::4");
             assertEq(amountB1, amountB1_, "test_Fuzz_Swap_OneForZero_Gt0::5");
@@ -301,12 +302,12 @@ contract TestTMMarket is Test, Parameters {
         require(vm.revertToStateAndDelete(snapshotId), "panic");
 
         (int256 amountAB0, int256 amountAB1) =
-            ITMMarket(market).getDeltaAmounts(false, int256(amountA + amountB), 2 ** 128 - 1);
+            ITMMarket(market).getDeltaAmounts(false, int256(amountA + amountB), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, amountA + amountB);
             (int256 amountAB0_, int256 amountAB1_) =
-                ITMMarket(market).swap(address(1), false, int256(amountA + amountB), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, int256(amountA + amountB), 2 ** 127 - 1);
 
             assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_OneForZero_Gt0::7");
             assertEq(amountAB1, amountAB1_, "test_Fuzz_Swap_OneForZero_Gt0::8");
@@ -326,11 +327,11 @@ contract TestTMMarket is Test, Parameters {
 
     function test_Fuzz_Swap_ZeroForOne_Gt0(uint256 before, uint256 amountA, uint256 amountB) public {
         {
-            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             before = bound(before, 1, uint256(maxAmount1));
 
             MockERC20(quoteToken).mint(market, before);
-            (int256 maxAmount0,) = ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
+            (int256 maxAmount0,) = ITMMarket(market).swap(address(this), false, int256(before), 2 ** 127 - 1);
 
             vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
@@ -390,13 +391,13 @@ contract TestTMMarket is Test, Parameters {
 
     function test_Fuzz_Swap_OneForZero_Lt0(uint256 before, uint256 amountA, uint256 amountB) public {
         {
-            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             before = bound(before, 1, uint256(maxAmount1) - 2);
 
             MockERC20(quoteToken).mint(market, before);
-            ITMMarket(market).swap(address(1), false, int256(before), 2 ** 128 - 1);
+            ITMMarket(market).swap(address(1), false, int256(before), 2 ** 127 - 1);
 
-            (int256 maxAmount0,) = ITMMarket(market).getDeltaAmounts(false, -2 ** 127, 2 ** 128 - 1);
+            (int256 maxAmount0,) = ITMMarket(market).getDeltaAmounts(false, -2 ** 127, 2 ** 127 - 1);
             vm.assume(-maxAmount0 >= 2);
             amountA = bound(amountA, 1, uint256(-maxAmount0) - 1);
             amountB = bound(amountB, 1, uint256(-maxAmount0) - amountA);
@@ -404,24 +405,24 @@ contract TestTMMarket is Test, Parameters {
 
         uint256 snapshotId = vm.snapshotState();
 
-        (int256 amountA0, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, -int256(amountA), 2 ** 128 - 1);
+        (int256 amountA0, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, -int256(amountA), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, uint256(amountA1));
             (int256 amountA0_, int256 amountA1_) =
-                ITMMarket(market).swap(address(1), false, -int256(amountA), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, -int256(amountA), 2 ** 127 - 1);
 
             assertEq(amountA0, amountA0_, "test_Fuzz_Swap_OneForZero_Lt0::1");
             assertEq(amountA0, -int256(amountA), "test_Fuzz_Swap_OneForZero_Lt0::2");
             assertEq(amountA1, amountA1_, "test_Fuzz_Swap_OneForZero_Lt0::3");
         }
 
-        (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, -int256(amountB), 2 ** 128 - 1);
+        (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, -int256(amountB), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, uint256(amountB1));
             (int256 amountB0_, int256 amountB1_) =
-                ITMMarket(market).swap(address(1), false, -int256(amountB), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, -int256(amountB), 2 ** 127 - 1);
 
             assertEq(amountB0, amountB0_, "test_Fuzz_Swap_OneForZero_Lt0::4");
             assertLe(_abs(amountB0), amountB, "test_Fuzz_Swap_OneForZero_FirstSegment_Gt0::6"); // As the price is rounded up, we might not be able to receive the exact amou, "test_Fuzz_Swap_OneForZero_Lt0::5");
@@ -431,12 +432,12 @@ contract TestTMMarket is Test, Parameters {
         require(vm.revertToStateAndDelete(snapshotId), "panic");
 
         (int256 amountAB0, int256 amountAB1) =
-            ITMMarket(market).getDeltaAmounts(false, -int256(amountA + amountB), 2 ** 128 - 1);
+            ITMMarket(market).getDeltaAmounts(false, -int256(amountA + amountB), 2 ** 127 - 1);
 
         {
             MockERC20(quoteToken).mint(market, uint256(amountAB1));
             (int256 amountAB0_, int256 amountAB1_) =
-                ITMMarket(market).swap(address(1), false, -(int256(amountA + amountB)), 2 ** 128 - 1);
+                ITMMarket(market).swap(address(1), false, -(int256(amountA + amountB)), 2 ** 127 - 1);
 
             assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_OneForZero_Lt0::7");
             assertEq(amountAB0, -int256(amountA + amountB), "test_Fuzz_Swap_OneForZero_Lt0::8");
@@ -461,11 +462,11 @@ contract TestTMMarket is Test, Parameters {
         (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
 
         {
-            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             before = bound(before, 1, uint256(maxAmount1));
 
             MockERC20(quoteToken).mint(market, before);
-            ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
+            ITMMarket(market).swap(address(this), false, int256(before), 2 ** 127 - 1);
 
             vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
@@ -537,11 +538,11 @@ contract TestTMMarket is Test, Parameters {
         (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
 
         {
-            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+            (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
             before = bound(before, 1, uint256(maxAmount1));
 
             MockERC20(quoteToken).mint(market, before);
-            ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
+            ITMMarket(market).swap(address(this), false, int256(before), 2 ** 127 - 1);
 
             vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
@@ -614,22 +615,22 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_Revert_Swap(uint256 before, uint256 amount0, uint256 amount1) public {
-        (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+        (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
         before = bound(before, 1, uint256(maxAmount1) - 2);
 
         MockERC20(quoteToken).mint(market, before);
-        ITMMarket(market).swap(address(this), false, int256(before), 2 ** 128 - 1);
+        ITMMarket(market).swap(address(this), false, int256(before), 2 ** 127 - 1);
 
-        (, maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 128 - 1);
+        (, maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
         amount1 = bound(amount1, 1, uint256(maxAmount1) - 1);
 
         MockERC20(quoteToken).mint(market, amount1 - 1);
 
         vm.expectRevert(ITMMarket.InsufficientBalance1.selector);
-        ITMMarket(market).swap(address(this), false, int256(amount1), 2 ** 128 - 1);
+        ITMMarket(market).swap(address(this), false, int256(amount1), 2 ** 127 - 1);
 
         MockERC20(quoteToken).mint(market, 1);
-        ITMMarket(market).swap(address(this), false, int256(amount1), 2 ** 128 - 1);
+        ITMMarket(market).swap(address(this), false, int256(amount1), 2 ** 127 - 1);
 
         vm.assume(ITMMarket(market).getCurrentSqrtRatio() > sqrtPrice0);
 
@@ -651,11 +652,11 @@ contract TestTMMarket is Test, Parameters {
         MockERC20(quoteToken).mint(market, 1e18);
 
         vm.expectRevert(ITMMarket.ReentrantCall.selector);
-        ITMMarket(market).swap(address(this), false, 1e18, 2 ** 128 - 1);
+        ITMMarket(market).swap(address(this), false, 1e18, 2 ** 127 - 1);
     }
 
     function onFeeReceived(address, uint256) external returns (bool) {
-        ITMMarket(msg.sender).swap(address(1), false, 1, 2 ** 128 - 1);
+        ITMMarket(msg.sender).swap(address(1), false, 1, 2 ** 127 - 1);
         return true;
     }
 

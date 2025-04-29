@@ -30,8 +30,8 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioX96` must fit into 128 bits
-     * - `sqrtTargetRatioX96` must fit into 128 bits
+     * - `sqrtRatioX96` must fit into 127 bits
+     * - `sqrtTargetRatioX96` must fit into 127 bits
      * - `liquidity` must fit into 127 bits
      * - `fee` must be less than MAX_FEE
      * - `deltaAmount` must fit into 128 bits
@@ -94,8 +94,8 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioAX96` must fit into 128 bits
-     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `sqrtRatioAX96` must fit into 127 bits
+     * - `sqrtRatioBX96` must fit into 127 bits
      * - `sqrtRatioAX96` must be lower or equal to `sqrtRatioBX96`
      * - `amount0` must fit into 128 bits
      */
@@ -115,8 +115,8 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioAX96` must fit into 128 bits
-     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `sqrtRatioAX96` must fit into 127 bits
+     * - `sqrtRatioBX96` must fit into 127 bits
      * - `liquidity` must fit into 127 bits
      */
     function getAmount0(uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 liquidity, bool adding)
@@ -126,7 +126,7 @@ library SwapMath {
     {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
         unchecked {
-            // The unchecked operations can't overflow as all parameters are all smaller than 2**128-1,
+            // The unchecked operations can't overflow as all parameters are all smaller than 2**127-1,
             // and `sqrtRatioAX96 < sqrtRatioBX96`. However, the result might not fit into 256 bits in
             // some cases, but these cases will be handled within the Math library.
             return adding
@@ -143,8 +143,8 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioAX96` must fit into 128 bits
-     * - `sqrtRatioBX96` must fit into 128 bits
+     * - `sqrtRatioAX96` must fit into 127 bits
+     * - `sqrtRatioBX96` must fit into 127 bits
      * - `liquidity` must fit into 127 bits
      */
     function getAmount1(uint256 sqrtRatioAX96, uint256 sqrtRatioBX96, uint256 liquidity, bool adding)
@@ -154,7 +154,7 @@ library SwapMath {
     {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
         unchecked {
-            // Can't overflow as all parameters are all smaller than 2**128-1, and `sqrtRatioAX96 < sqrtRatioBX96`
+            // Can't overflow as all parameters are all smaller than 2**127-1, and `sqrtRatioAX96 < sqrtRatioBX96`
             return adding
                 ? Math.divUp(liquidity * (sqrtRatioBX96 - sqrtRatioAX96), 2 ** 96)
                 : liquidity * (sqrtRatioBX96 - sqrtRatioAX96) >> 96;
@@ -172,7 +172,7 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioX96` must fit into 128 bits
+     * - `sqrtRatioX96` must fit into 127 bits
      * - `liquidity` must fit into 127 bits
      * - `amount0` must fit into 128 bits
      * - `sqrtNextX96` must not overflow or underflow
@@ -202,7 +202,7 @@ library SwapMath {
      *
      * Requirements:
      *
-     * - `sqrtRatioX96` must fit into 128 bits
+     * - `sqrtRatioX96` must fit into 127 bits
      * - `liquidity` must fit into 127 bits
      * - `amount1` must fit into 128 bits
      * - `sqrtNextX96` must not overflow or underflow
@@ -213,7 +213,7 @@ library SwapMath {
         returns (uint256 sqrtNextX96)
     {
         unchecked {
-            // `sqrtRatioX96 * liquidity` can't overflow as it's a uint128 * uint127, it fits in int256
+            // `sqrtRatioX96 * liquidity` can't overflow as it's a uint127 * uint127, it fits in int256
             int256 numerator = int256(sqrtRatioX96 * liquidity) + (amount1 << 96); // `amount1 << 96` can't overflow as it's a int128
             if (numerator <= 0) revert LiquidityOverflow1();
             return uint256(numerator) / liquidity;
