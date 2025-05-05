@@ -84,7 +84,7 @@ interface ITMFactory {
 
     function getMarketByCreatorAt(address creator, uint256 index) external view returns (address);
 
-    function createMarket(string calldata name, string calldata symbol, address quoteToken)
+    function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
         external
         returns (address token, address market);
 

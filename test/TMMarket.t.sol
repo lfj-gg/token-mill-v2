@@ -40,7 +40,9 @@ contract TestTMMarket is Test, Parameters {
             )
         );
 
-        (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
+        (token, market) = ITMFactory(factory).createMarket(
+            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
+        );
     }
 
     function test_Fuzz_TargetRatio(uint256 currentSqrtRatioX96, bool zeroForOne, uint256 sqrtRatioLimitX96)
@@ -459,7 +461,9 @@ contract TestTMMarket is Test, Parameters {
         vm.prank(admin);
         ITMFactory(factory).setDefaultFee(0); // Set default fee to 0 to fully validate invariants 16
 
-        (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
+        (token, market) = ITMFactory(factory).createMarket(
+            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
+        );
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
@@ -535,7 +539,9 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_Swap_ZeroForOne_Lt0_WithFees(uint256 before, uint256 amountA, uint256 amountB) public {
-        (token, market) = ITMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken);
+        (token, market) = ITMFactory(factory).createMarket(
+            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
+        );
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);

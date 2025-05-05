@@ -214,10 +214,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Creates a new market with {name}, {symbol} and {quoteToken}.
+     * @dev Creates a new market with {name}, {symbol}, {quoteToken} and {feeRecipient}.
      * The market will be created with the default fee and the creator will be set to the caller of this function.
-     * By default, the fee recipient will be set to the KOTM fee recipient. To opt-out of the KOTM feature, the creator
-     * can update the fee recipient to another address.
      * Emits a {MarketCreated} event with the creator, quote token, market, token, name and symbol.
      * Emits a {MarketDetailsUpdated} event with the market, creator and fee recipient.
      *
@@ -225,7 +223,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      *
      * - The {quoteToken} must be supported by the factory.
      */
-    function createMarket(string calldata name, string calldata symbol, address quoteToken)
+    function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
         external
         override
         returns (address token, address market)
@@ -239,12 +237,12 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             initialized: true,
             lastFeeRecipientUpdate: uint88(block.timestamp),
             creator: msg.sender,
-            feeRecipient: KOTM_FEE_RECIPIENT()
+            feeRecipient: feeRecipient
         });
         _marketsByCreator[msg.sender].add(market);
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
-        emit MarketDetailsUpdated(market, msg.sender, KOTM_FEE_RECIPIENT());
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient);
     }
 
     /**
