@@ -622,7 +622,9 @@ contract TestTMMarket is Test, Parameters {
         // Error is due to fee0 swapped to token1, it increases the actual number of token received by the user
         // in this specific case. However, as the fuzz tests show, the error is less than 1e-18.
         assertGe(
-            _abs(amountA0) + _abs(amountB0), _abs(amountAB0) * (1e18 - 1) / 1e18, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::16"
+            _abs(amountA0) + _abs(amountB0),
+            _abs(amountAB0) * (1e18 - 1) / 1e18,
+            "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::16"
         );
         assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::17");
     }
