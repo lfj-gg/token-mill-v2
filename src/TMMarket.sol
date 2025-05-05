@@ -262,7 +262,7 @@ contract TMMarket is ITMMarket {
                 reserve1 = Math.addDelta128(reserve1, amount1);
                 reserve0 = Math.addDelta128(reserve0, amount0);
 
-                if (reserve1 + feeAmount1 > IERC20(token1).balanceOf(address(this))) revert InsufficientBalance1();
+                if (reserve1 > IERC20(token1).balanceOf(address(this))) revert InsufficientBalance1();
                 IERC20(_token0).safeTransfer(to, uint256(-amount0));
 
                 feeAmount1 = feeAmountIn;
