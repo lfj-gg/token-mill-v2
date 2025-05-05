@@ -427,7 +427,9 @@ contract TestTMMarket is Test, Parameters {
                 ITMMarket(market).swap(address(1), false, -int256(amountB), 2 ** 127 - 1);
 
             assertEq(amountB0, amountB0_, "test_Fuzz_Swap_OneForZero_Lt0::4");
-            assertLe(_abs(amountB0), amountB, "test_Fuzz_Swap_OneForZero_FirstSegment_Gt0::6"); // As the price is rounded up, we might not be able to receive the exact amou, "test_Fuzz_Swap_OneForZero_Lt0::5");
+
+            // As the price is rounded up, we might not be able to receive the exact amount
+            assertLe(_abs(amountB0), amountB, "test_Fuzz_Swap_OneForZero_Lt0::5");
             assertEq(amountB1, amountB1_, "test_Fuzz_Swap_OneForZero_Lt0::6");
         }
 
@@ -458,8 +460,9 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_Swap_ZeroForOne_Lt0_NoFees(uint256 before, uint256 amountA, uint256 amountB) public {
+        // Set default fee to 0 to fully validate invariants 16
         vm.prank(admin);
-        ITMFactory(factory).setDefaultFee(0); // Set default fee to 0 to fully validate invariants 16
+        ITMFactory(factory).setDefaultFee(0);
 
         (token, market) = ITMFactory(factory).createMarket(
             "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
@@ -493,9 +496,9 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountA0_, int256 amountA1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA), sqrtPrice0);
 
-            assertEq(amountA0, amountA0_, "test_Fuzz_Swap_ZeroForOne_Lt0::1");
-            assertEq(amountA1, amountA1_, "test_Fuzz_Swap_ZeroForOne_Lt0::2");
-            assertEq(amountA1, -int256(amountA), "test_Fuzz_Swap_ZeroForOne_Lt0::3");
+            assertEq(amountA0, amountA0_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::1");
+            assertEq(amountA1, amountA1_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::2");
+            assertEq(amountA1, -int256(amountA), "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::3");
         }
 
         (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(true, -int256(amountB), sqrtPrice0);
@@ -507,9 +510,11 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountB0_, int256 amountB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountB), sqrtPrice0);
 
-            assertEq(amountB0, amountB0_, "test_Fuzz_Swap_ZeroForOne_Lt0::4");
-            assertEq(amountB1, amountB1_, "test_Fuzz_Swap_ZeroForOne_Lt0::5");
-            assertLe(_abs(amountB1), amountB, "test_Fuzz_Swap_OneForZero_FirstSegment_Gt0::6"); // As the price is rounded down, we might not be able to receive the exact amou, "test_Fuzz_Swap_ZeroForOne_Lt0::6");
+            assertEq(amountB0, amountB0_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::4");
+            assertEq(amountB1, amountB1_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::5");
+
+            // As the price is rounded down, we might not be able to receive the exact amount
+            assertLe(_abs(amountB1), amountB, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::6");
         }
 
         require(vm.revertToStateAndDelete(snapshotId), "panic");
@@ -522,20 +527,20 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountAB0_, int256 amountAB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA + amountB), sqrtPrice0);
 
-            assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_ZeroForOne_Lt0::7");
-            assertEq(amountAB1, amountAB1_, "test_Fuzz_Swap_ZeroForOne_Lt0::8");
-            assertEq(amountAB1, -int256(amountA + amountB), "test_Fuzz_Swap_ZeroForOne_Lt0::9");
+            assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::7");
+            assertEq(amountAB1, amountAB1_, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::8");
+            assertEq(amountAB1, -int256(amountA + amountB), "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::9");
         }
 
-        assertGe(amountA0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::10");
-        assertGe(amountB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::11");
-        assertGe(amountAB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::12");
-        assertLe(amountA1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::13");
-        assertLe(amountB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::14");
-        assertLe(amountAB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::15");
+        assertGe(amountA0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::10");
+        assertGe(amountB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::11");
+        assertGe(amountAB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::12");
+        assertLe(amountA1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::13");
+        assertLe(amountB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::14");
+        assertLe(amountAB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::15");
 
-        assertGe(_abs(amountA0) + _abs(amountB0), _abs(amountAB0), "test_Fuzz_Swap_ZeroForOne_Lt0::16");
-        assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0::17");
+        assertGe(_abs(amountA0) + _abs(amountB0), _abs(amountAB0), "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::16");
+        assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0_NoFees::17");
     }
 
     function test_Fuzz_Swap_ZeroForOne_Lt0_WithFees(uint256 before, uint256 amountA, uint256 amountB) public {
@@ -571,9 +576,9 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountA0_, int256 amountA1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA), sqrtPrice0);
 
-            assertEq(amountA0, amountA0_, "test_Fuzz_Swap_ZeroForOne_Lt0::1");
-            assertEq(amountA1, amountA1_, "test_Fuzz_Swap_ZeroForOne_Lt0::2");
-            assertEq(amountA1, -int256(amountA), "test_Fuzz_Swap_ZeroForOne_Lt0::3");
+            assertEq(amountA0, amountA0_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::1");
+            assertEq(amountA1, amountA1_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::2");
+            assertEq(amountA1, -int256(amountA), "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::3");
         }
 
         (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(true, -int256(amountB), sqrtPrice0);
@@ -585,9 +590,11 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountB0_, int256 amountB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountB), sqrtPrice0);
 
-            assertEq(amountB0, amountB0_, "test_Fuzz_Swap_ZeroForOne_Lt0::4");
-            assertEq(amountB1, amountB1_, "test_Fuzz_Swap_ZeroForOne_Lt0::5");
-            assertLe(_abs(amountB1), amountB, "test_Fuzz_Swap_OneForZero_FirstSegment_Gt0::6"); // As the price is rounded down, we might not be able to receive the exact amou, "test_Fuzz_Swap_ZeroForOne_Lt0::6");
+            assertEq(amountB0, amountB0_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::4");
+            assertEq(amountB1, amountB1_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::5");
+
+            // As the price is rounded down, we might not be able to receive the exact amount
+            assertLe(_abs(amountB1), amountB, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::6");
         }
 
         require(vm.revertToStateAndDelete(snapshotId), "panic");
@@ -600,24 +607,24 @@ contract TestTMMarket is Test, Parameters {
             (int256 amountAB0_, int256 amountAB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA + amountB), sqrtPrice0);
 
-            assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_ZeroForOne_Lt0::7");
-            assertEq(amountAB1, amountAB1_, "test_Fuzz_Swap_ZeroForOne_Lt0::8");
-            assertEq(amountAB1, -int256(amountA + amountB), "test_Fuzz_Swap_ZeroForOne_Lt0::9");
+            assertEq(amountAB0, amountAB0_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::7");
+            assertEq(amountAB1, amountAB1_, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::8");
+            assertEq(amountAB1, -int256(amountA + amountB), "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::9");
         }
 
-        assertGe(amountA0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::10");
-        assertGe(amountB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::11");
-        assertGe(amountAB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::12");
-        assertLe(amountA1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::13");
-        assertLe(amountB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::14");
-        assertLe(amountAB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0::15");
+        assertGe(amountA0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::10");
+        assertGe(amountB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::11");
+        assertGe(amountAB0, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::12");
+        assertLe(amountA1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::13");
+        assertLe(amountB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::14");
+        assertLe(amountAB1, 0, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::15");
 
         // Error is due to fee0 swapped to token1, it increases the actual number of token received by the user
         // in this specific case. However, as the fuzz tests show, the error is less than 1e-18.
         assertGe(
-            _abs(amountA0) + _abs(amountB0), _abs(amountAB0) * (1e18 - 1) / 1e18, "test_Fuzz_Swap_ZeroForOne_Lt0::16"
+            _abs(amountA0) + _abs(amountB0), _abs(amountAB0) * (1e18 - 1) / 1e18, "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::16"
         );
-        assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0::17");
+        assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::17");
     }
 
     function test_Fuzz_Revert_Swap(uint256 before, uint256 amount0, uint256 amount1) public {
