@@ -636,7 +636,7 @@ contract TestTMFactory is Test {
     }
 
     function test_Fuzz_Revert_AcceptMarketCreator(address caller, address market) public {
-        if (caller == address(this)) caller = address(1);
+        if (caller == address(this) || caller == address(0)) caller = address(1);
 
         vm.expectRevert(ITMFactory.InvalidMarket.selector);
         TMFactory(factory).acceptMarketCreator(market);
