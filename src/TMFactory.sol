@@ -237,12 +237,13 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             initialized: true,
             lastFeeRecipientUpdate: uint88(block.timestamp),
             creator: msg.sender,
-            feeRecipient: feeRecipient
+            feeRecipient: feeRecipient,
+            pendingCreator: address(0)
         });
         _marketsByCreator[msg.sender].add(market);
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
-        emit MarketDetailsUpdated(market, msg.sender, feeRecipient);
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
     }
 
     /**
@@ -294,7 +295,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      * - The {market} must be initialized.
      * - The caller must be the current creator of the {market}.
      */
-    function updateMarketDetails(address market, address creator, address feeRecipient)
+    function updateMarketDetails(address market, address pendingCreator, address feeRecipient)
         external
         override
         returns (bool)
@@ -304,7 +305,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         if (!details.initialized) revert InvalidMarket();
         if (details.creator != msg.sender) revert Unauthorized();
 
-        details.creator = creator;
+        details.pendingCreator = pendingCreator;
 
         if (feeRecipient != details.feeRecipient) {
             uint256 nextUpdateTime = uint256(details.lastFeeRecipientUpdate) + _minUpdateTime;
@@ -314,10 +315,33 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             details.feeRecipient = feeRecipient;
         }
 
-        _marketsByCreator[msg.sender].remove(market);
-        _marketsByCreator[creator].add(market);
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, pendingCreator);
+        return true;
+    }
 
-        emit MarketDetailsUpdated(market, creator, feeRecipient);
+    /**
+     * @dev Accepts the pending creator of the {market}.
+     * Emits a {MarketDetailsUpdated} event with the market, creator and fee recipient.
+     *
+     * Requirements:
+     *
+     * - The {market} must be initialized.
+     * - The caller must be the pending creator of the {market}.
+     */
+    function acceptMarketCreator(address market) external override returns (bool) {
+        MarketDetails storage details = _details[market];
+
+        if (!details.initialized) revert InvalidMarket();
+        if (details.pendingCreator != msg.sender) revert Unauthorized();
+
+        address oldCreator = details.creator;
+        details.creator = msg.sender;
+        delete details.pendingCreator;
+
+        _marketsByCreator[oldCreator].remove(market);
+        _marketsByCreator[msg.sender].add(market);
+
+        emit MarketDetailsUpdated(market, msg.sender, details.feeRecipient, address(0));
         return true;
     }
 

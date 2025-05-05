@@ -17,7 +17,9 @@ interface ITMFactory {
         address indexed creator, address indexed quoteToken, address market, address token, string name, string symbol
     );
     event FeesCollected(address indexed sender, address indexed account, address indexed token, uint256 amount);
-    event MarketDetailsUpdated(address indexed market, address indexed creator, address indexed feeRecipient);
+    event MarketDetailsUpdated(
+        address indexed market, address indexed creator, address indexed feeRecipient, address pendingCreator
+    );
     event ProtocolFeeShareSet(address indexed sender, uint256 protocolFeeShare);
     event DefaultFeeSet(address indexed sender, uint256 defaultFee);
     event MarketImplementationSet(address indexed sender, address indexed quoteToken, address marketImplementation);
@@ -32,6 +34,7 @@ interface ITMFactory {
         uint88 lastFeeRecipientUpdate;
         address feeRecipient;
         address creator;
+        address pendingCreator;
     }
 
     function initialize(
@@ -90,7 +93,11 @@ interface ITMFactory {
 
     function collect(address token, address account, address recipient, uint256 amount) external returns (bool);
 
-    function updateMarketDetails(address market, address creator, address feeRecipient) external returns (bool);
+    function updateMarketDetails(address market, address pendingCreator, address feeRecipient)
+        external
+        returns (bool);
+
+    function acceptMarketCreator(address market) external returns (bool);
 
     function setMinUpdateTime(uint256 minUpdateTime) external returns (bool);
 
