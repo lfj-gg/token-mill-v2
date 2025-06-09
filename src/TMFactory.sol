@@ -143,7 +143,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Returns wether the market is initialized, the fee recipient and the creator address of the {market}.
+     * @dev Returns whether the market is initialized, the fee recipient and the creator address of the {market}.
      */
     function getMarketDetails(address market) external view override returns (MarketDetails memory) {
         return _details[market];
@@ -214,10 +214,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Creates a new market with {name}, {symbol} and {quoteToken}.
+     * @dev Creates a new market with {name}, {symbol}, {quoteToken} and {feeRecipient}.
      * The market will be created with the default fee and the creator will be set to the caller of this function.
-     * By default, the fee recipient will be set to the KOTM fee recipient. To opt-out of the KOTM feature, the creator
-     * can update the fee recipient to another address.
      * Emits a {MarketCreated} event with the creator, quote token, market, token, name and symbol.
      * Emits a {MarketDetailsUpdated} event with the market, creator and fee recipient.
      *
@@ -225,7 +223,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      *
      * - The {quoteToken} must be supported by the factory.
      */
-    function createMarket(string calldata name, string calldata symbol, address quoteToken)
+    function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
         external
         override
         returns (address token, address market)
@@ -239,12 +237,13 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             initialized: true,
             lastFeeRecipientUpdate: uint88(block.timestamp),
             creator: msg.sender,
-            feeRecipient: KOTM_FEE_RECIPIENT()
+            feeRecipient: feeRecipient,
+            pendingCreator: address(0)
         });
         _marketsByCreator[msg.sender].add(market);
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
-        emit MarketDetailsUpdated(market, msg.sender, KOTM_FEE_RECIPIENT());
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
     }
 
     /**
@@ -296,7 +295,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      * - The {market} must be initialized.
      * - The caller must be the current creator of the {market}.
      */
-    function updateMarketDetails(address market, address creator, address feeRecipient)
+    function updateMarketDetails(address market, address pendingCreator, address feeRecipient)
         external
         override
         returns (bool)
@@ -306,7 +305,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         if (!details.initialized) revert InvalidMarket();
         if (details.creator != msg.sender) revert Unauthorized();
 
-        details.creator = creator;
+        details.pendingCreator = pendingCreator;
 
         if (feeRecipient != details.feeRecipient) {
             uint256 nextUpdateTime = uint256(details.lastFeeRecipientUpdate) + _minUpdateTime;
@@ -316,10 +315,33 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             details.feeRecipient = feeRecipient;
         }
 
-        _marketsByCreator[msg.sender].remove(market);
-        _marketsByCreator[creator].add(market);
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, pendingCreator);
+        return true;
+    }
 
-        emit MarketDetailsUpdated(market, creator, feeRecipient);
+    /**
+     * @dev Accepts the pending creator of the {market}.
+     * Emits a {MarketDetailsUpdated} event with the market, creator and fee recipient.
+     *
+     * Requirements:
+     *
+     * - The {market} must be initialized.
+     * - The caller must be the pending creator of the {market}.
+     */
+    function acceptMarketCreator(address market) external override returns (bool) {
+        MarketDetails storage details = _details[market];
+
+        if (!details.initialized) revert InvalidMarket();
+        if (details.pendingCreator != msg.sender) revert Unauthorized();
+
+        address oldCreator = details.creator;
+        details.creator = msg.sender;
+        delete details.pendingCreator;
+
+        _marketsByCreator[oldCreator].remove(market);
+        _marketsByCreator[msg.sender].add(market);
+
+        emit MarketDetailsUpdated(market, msg.sender, details.feeRecipient, address(0));
         return true;
     }
 

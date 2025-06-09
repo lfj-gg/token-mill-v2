@@ -31,7 +31,7 @@ contract TMMarket is ITMMarket {
     uint256 private immutable liquidityB; // Liquidity after graduation
     uint256 private immutable sqrtRatioAX96; // Start price, calculated as sqrt((price0 * 10^decimals1) / (price1 * 10^decimals0)) * 2^96
     uint256 private immutable sqrtRatioBX96; // Graduation price, calculated in the same way as sqrtRatioAX96
-    uint256 private constant sqrtRatioMaxX96 = type(uint128).max; // Maximum price
+    uint256 private constant sqrtRatioMaxX96 = 2 ** 127 - 1; // Maximum price
     uint256 private immutable maxSupply;
 
     address private _token0; // Base token
@@ -211,7 +211,7 @@ contract TMMarket is ITMMarket {
      * @dev Swaps `deltaAmount` of token0 for token1 or vice versa.
      * If `zeroForOne` is true, the input is token0 and the output is token1.
      * If `zeroForOne` is false, the input is token1 and the output is token0.
-     * The `deltaAmount` defines wether the swap is an exact input or output swap.
+     * The `deltaAmount` defines whether the swap is an exact input or output swap.
      * The `sqrtRatioLimitX96` is the price limit in 32x96 format. If zero for one, the price cannot be less than this value after the swap.
      * If one for zero, the price cannot be greater than this value after the swap
      * The function will emit a `Swap` event with the details of the swap.
@@ -262,7 +262,7 @@ contract TMMarket is ITMMarket {
                 reserve1 = Math.addDelta128(reserve1, amount1);
                 reserve0 = Math.addDelta128(reserve0, amount0);
 
-                if (reserve1 + feeAmount1 > IERC20(token1).balanceOf(address(this))) revert InsufficientBalance1();
+                if (reserve1 > IERC20(token1).balanceOf(address(this))) revert InsufficientBalance1();
                 IERC20(_token0).safeTransfer(to, uint256(-amount0));
 
                 feeAmount1 = feeAmountIn;
