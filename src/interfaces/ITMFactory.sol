@@ -12,6 +12,7 @@ interface ITMFactory {
     error MinUpdateTimeNotPassed(uint256 nextUpdateTime);
     error InvalidMinUpdateTime();
     error MismatchedQuoteToken();
+    error InvalidFeeRecipient();
 
     event MarketCreated(
         address indexed creator, address indexed quoteToken, address market, address token, string name, string symbol

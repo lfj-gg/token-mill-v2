@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "src/TMMarket.sol";
-import "src/TMToken.sol";
-import "src/TMFactory.sol";
-import "script/Parameters.sol";
-import "test/mocks/MockERC20.sol";
+import {Parameters} from "script/Parameters.sol";
+import {ITMFactory, TMFactory} from "src/TMFactory.sol";
+import {ITMMarket, TMMarket} from "src/TMMarket.sol";
+import {ITMToken, TMToken} from "src/TMToken.sol";
+import {Math, SwapMath} from "src/libraries/SwapMath.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract TestTMMarket is Test, Parameters {
     address tokenImplementation;
@@ -346,6 +348,7 @@ contract TestTMMarket is Test, Parameters {
         (int256 amountA0, int256 amountA1) = ITMMarket(market).getDeltaAmounts(true, int256(amountA), sqrtPrice0);
 
         {
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, amountA);
             (int256 amountA0_, int256 amountA1_) = ITMMarket(market).swap(address(1), true, int256(amountA), sqrtPrice0);
 
@@ -357,6 +360,7 @@ contract TestTMMarket is Test, Parameters {
         (int256 amountB0, int256 amountB1) = ITMMarket(market).getDeltaAmounts(true, int256(amountB), sqrtPrice0);
 
         {
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, amountB);
             (int256 amountB0_, int256 amountB1_) = ITMMarket(market).swap(address(1), true, int256(amountB), sqrtPrice0);
 
@@ -371,6 +375,7 @@ contract TestTMMarket is Test, Parameters {
             ITMMarket(market).getDeltaAmounts(true, int256(amountA + amountB), sqrtPrice0);
 
         {
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, amountA + amountB);
             (int256 amountAB0_, int256 amountAB1_) =
                 ITMMarket(market).swap(address(1), true, int256(amountA + amountB), sqrtPrice0);
@@ -492,6 +497,7 @@ contract TestTMMarket is Test, Parameters {
         {
             vm.assume(IERC20(token).balanceOf(address(this)) >= uint256(amountA0));
 
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountA0));
             (int256 amountA0_, int256 amountA1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA), sqrtPrice0);
@@ -506,6 +512,7 @@ contract TestTMMarket is Test, Parameters {
         {
             vm.assume(IERC20(token).balanceOf(address(this)) >= uint256(amountB0));
 
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountB0));
             (int256 amountB0_, int256 amountB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountB), sqrtPrice0);
@@ -523,6 +530,7 @@ contract TestTMMarket is Test, Parameters {
             ITMMarket(market).getDeltaAmounts(true, -int256(amountA + amountB), sqrtPrice0);
 
         {
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountAB0));
             (int256 amountAB0_, int256 amountAB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA + amountB), sqrtPrice0);
@@ -572,6 +580,7 @@ contract TestTMMarket is Test, Parameters {
         {
             vm.assume(IERC20(token).balanceOf(address(this)) >= uint256(amountA0));
 
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountA0));
             (int256 amountA0_, int256 amountA1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA), sqrtPrice0);
@@ -586,6 +595,7 @@ contract TestTMMarket is Test, Parameters {
         {
             vm.assume(IERC20(token).balanceOf(address(this)) >= uint256(amountB0));
 
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountB0));
             (int256 amountB0_, int256 amountB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountB), sqrtPrice0);
@@ -603,6 +613,7 @@ contract TestTMMarket is Test, Parameters {
             ITMMarket(market).getDeltaAmounts(true, -int256(amountA + amountB), sqrtPrice0);
 
         {
+            // forge-lint: disable-next-line(erc20-unchecked-transfer)
             IERC20(token).transfer(market, uint256(amountAB0));
             (int256 amountAB0_, int256 amountAB1_) =
                 ITMMarket(market).swap(address(1), true, -int256(amountA + amountB), sqrtPrice0);
@@ -654,6 +665,7 @@ contract TestTMMarket is Test, Parameters {
         uint256 balance = MockERC20(token).balanceOf(address(this));
         if (amount0 > balance) amount0 = balance;
 
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         IERC20(token).transfer(market, amount0 - 1);
 
         vm.expectRevert(ITMMarket.InsufficientBalance0.selector);

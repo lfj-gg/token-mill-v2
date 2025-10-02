@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "src/libraries/SwapMath.sol";
+import {Math, SwapMath} from "src/libraries/SwapMath.sol";
 
 contract SwapMathTest is Test {
     function test_fuzz_GetLiquidityAndAmount0(uint256 sqrtPriceAX96, uint256 sqrtPriceBX96, uint256 amount0)

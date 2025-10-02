@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-import {ITMToken} from "./interfaces/ITMToken.sol";
 import {ITMFactory} from "./interfaces/ITMFactory.sol";
+import {ITMToken} from "./interfaces/ITMToken.sol";
 
 /**
  * @title TokenMill Token contract

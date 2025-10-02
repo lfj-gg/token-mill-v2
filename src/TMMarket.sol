@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {ITMFactory} from "./interfaces/ITMFactory.sol";
+import {ITMMarket} from "./interfaces/ITMMarket.sol";
+import {ITMToken} from "./interfaces/ITMToken.sol";
 import {Math} from "./libraries/SwapMath.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
-import {ITMToken} from "./interfaces/ITMToken.sol";
-import {ITMMarket} from "./interfaces/ITMMarket.sol";
-import {ITMFactory} from "./interfaces/ITMFactory.sol";
 
 /**
  * @title TokenMill Market contract
  * @dev Market contract that allows swapping tokens with a fixed fee.
- * The fee amount will be sent to the factory if the token is the quote token (token1). If it is the base token (token0),
- * the fee will be directly swapped to the quote token and sent to the factory as well.
+ * The fee amount will be sent to the factory if the token is the quote token (token1). If it is the base token
+ * (token0), the fee will be directly swapped to the quote token and sent to the factory as well.
  * The market behaves like 2 uniswap v2 pools, the first one will range from sqrtRatioAX96 to sqrtRatioBX96,
  * and the second one will range from sqrtRatioBX96 to sqrtRatioMaxX96. The liquidity available in each internal pool
  * is decided at the creation of the contract and allows each pool to offer at most amount0A and amount0B of token0 (the
@@ -51,12 +51,15 @@ contract TMMarket is ITMMarket {
     }
 
     /**
-     * @dev Sets the immutable values for {factory}, {quoteToken}, {liquidityA}, {liquidityB}, {sqrtRatioAX96}, {sqrtRatioBX96} and {maxSupply}.
+     * @dev Sets the immutable values for {factory}, {quoteToken}, {liquidityA}, {liquidityB}, {sqrtRatioAX96},
+     * {sqrtRatioBX96} and {maxSupply}.
      * The ratios must have been calculated correctly accounting for the decimals of each token, the formula is:
      * `sqrt((price0 * 10^decimals1) / (price1 * 10^decimals0)) * 2^96`.
-     * The liquidityA and liquidityB parameters are the liquidity of the two xyk pools before and after the graduation price.
+     * The liquidityA and liquidityB parameters are the liquidity of the two xyk pools before and after the graduation
+     * price.
      * They will be calculated directly from the amount0 and ratio parameters.
-     * The maximum supply of the token is the sum of amount0A and amount0B, each pool will never offer more than its respective amount.
+     * The maximum supply of the token is the sum of amount0A and amount0B, each pool will never offer more than its
+     * respective amount.
      *
      * Requirements:
      *
@@ -138,7 +141,8 @@ contract TMMarket is ITMMarket {
 
     /**
      * @dev Returns the sqrt ratios of the two xyk pools.
-     * The first pool will be from sqrtRatioAX96 to sqrtRatioBX96, and the second pool will be from sqrtRatioBX96 to sqrtRatioMaxX96.
+     * The first pool will be from sqrtRatioAX96 to sqrtRatioBX96, and the second pool will be from sqrtRatioBX96 to
+     * sqrtRatioMaxX96.
      */
     function getSqrtRatiosBounds() external view override returns (uint256, uint256, uint256) {
         return (sqrtRatioAX96, sqrtRatioBX96, sqrtRatioMaxX96);
@@ -184,9 +188,11 @@ contract TMMarket is ITMMarket {
      * If zeroForOne is true, the input is token0 and the output is token1.
      * If zeroForOne is false, the input is token1 and the output is token0.
      * If deltaAmount is positive, the function will try to swap as much input as possible, up to abs(deltaAmount).
-     * If deltaAmount is negative, the function will try to swap as much input as possible in order to get abs(deltaAmount)
+     * If deltaAmount is negative, the function will try to swap as much input as possible in order to get
+     * abs(deltaAmount)
      * of output token.
-     * In any case, the function will never exceed the exact input (if deltaAmount is positive) or output (if deltaAmount
+     * In any case, the function will never exceed the exact input (if deltaAmount is positive) or output (if
+     * deltaAmount
      * is negative) amount.
      * The positive amount returned must be sent to the contract prior to calling the swap function.
      * The negative amount returned will be sent to the caller after the swap.
@@ -212,7 +218,8 @@ contract TMMarket is ITMMarket {
      * If `zeroForOne` is true, the input is token0 and the output is token1.
      * If `zeroForOne` is false, the input is token1 and the output is token0.
      * The `deltaAmount` defines whether the swap is an exact input or output swap.
-     * The `sqrtRatioLimitX96` is the price limit in 32x96 format. If zero for one, the price cannot be less than this value after the swap.
+     * The `sqrtRatioLimitX96` is the price limit in 32x96 format. If zero for one, the price cannot be less than this
+     * value after the swap.
      * If one for zero, the price cannot be greater than this value after the swap
      * The function will emit a `Swap` event with the details of the swap.
      * The fee will be sent to the factory if the token is the quote token (token1). If it is the base token (token0),
@@ -338,7 +345,8 @@ contract TMMarket is ITMMarket {
             feeAmountIn += feeAmountIn_;
         }
 
-        // If `amountIn + feeAmountIn < 2**127`, then `feeAmountIn < 2**127`. All results can be casted to `int128`, `uint128` or above.
+        // If `amountIn + feeAmountIn < 2**127`, then `feeAmountIn < 2**127`. All results can be casted to `int128`,
+        // `uint128` or above.
         return (nextSqrtRatioX96, Math.safeUint127(amountIn + feeAmountIn), Math.safeUint127(amountOut), feeAmountIn);
     }
 }

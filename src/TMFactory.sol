@@ -2,15 +2,15 @@
 pragma solidity 0.8.24;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {ITMFactory} from "./interfaces/ITMFactory.sol";
+import {ITMMarket} from "./interfaces/ITMMarket.sol";
+import {ITMToken} from "./interfaces/ITMToken.sol";
 import {Math} from "./libraries/Math.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
-import {ITMFactory} from "./interfaces/ITMFactory.sol";
-import {ITMToken} from "./interfaces/ITMToken.sol";
-import {ITMMarket} from "./interfaces/ITMMarket.sol";
 
 /**
  * @title TokenMill Factory contract
@@ -52,8 +52,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     mapping(address creator => EnumerableSet.AddressSet) private _marketsByCreator;
 
     /**
-     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {quoteToken} to {marketImplementation},
-     * {tokenImplementation} and {admin}.
+     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {quoteToken} to
+     * {marketImplementation}, {tokenImplementation} and {admin}.
      */
     constructor(
         uint256 minUpdateTime,
@@ -228,6 +228,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         override
         returns (address token, address market)
     {
+        if (feeRecipient != KOTM_FEE_RECIPIENT()) revert InvalidFeeRecipient();
+
         (token, market) = _createMarket(name, symbol, quoteToken);
 
         _tokens.push(token);
@@ -308,6 +310,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         details.pendingCreator = pendingCreator;
 
         if (feeRecipient != details.feeRecipient) {
+            if (feeRecipient != KOTM_FEE_RECIPIENT()) revert InvalidFeeRecipient();
+
             uint256 nextUpdateTime = uint256(details.lastFeeRecipientUpdate) + _minUpdateTime;
             if (nextUpdateTime > block.timestamp) revert MinUpdateTimeNotPassed(nextUpdateTime);
 
@@ -359,7 +363,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Updates the {protocolFeeShare} percent that will be collected on each swap for all markets created by this factory.
+     * @dev Updates the {protocolFeeShare} percent that will be collected on each swap for all markets created by this
+     * factory.
      * Emits a {ProtocolFeeShareSet} event with the sender and the {protocolFeeShare}.
      *
      * Requirements:
@@ -429,7 +434,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Receives the {amount} of {token} from a market and splits the fee between the protocol and the fee recipient.
+     * @dev Receives the {amount} of {token} from a market and splits the fee between the protocol and the fee
+     * recipient.
      * The protocol fee is calculated based on the {protocolFeeShare} and the rest is sent to the fee recipient.
      * Emits a {FeeReceived} event with the market, token, fee recipient, fee and protocol fee.
      *
