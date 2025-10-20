@@ -495,6 +495,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     function _setMinUpdateTime(uint256 minUpdateTime) internal {
         if (minUpdateTime >= 2 ** 88) revert InvalidMinUpdateTime();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _minUpdateTime = uint88(minUpdateTime);
 
         emit MinUpdateTimeSet(msg.sender, minUpdateTime);
@@ -511,6 +512,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     function _setProtocolFeeShare(uint256 protocolFeeShare) internal {
         if (protocolFeeShare > SwapMath.MAX_FEE) revert InvalidFee();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _protocolFeeShare = uint64(protocolFeeShare);
 
         emit ProtocolFeeShareSet(msg.sender, protocolFeeShare);
@@ -527,6 +529,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     function _setDefaultFee(uint256 defaultFee) internal {
         if (defaultFee > SwapMath.MAX_FEE) revert InvalidFee();
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _defaultFee = uint64(defaultFee);
 
         emit DefaultFeeSet(msg.sender, defaultFee);

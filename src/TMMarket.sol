@@ -115,10 +115,13 @@ contract TMMarket is ITMMarket {
 
         _token0 = token;
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _sqrtRatioX96 = uint128(sqrtRatioAX96);
+        // forge-lint: disable-next-line(unsafe-typecast)
         _fee = uint64(fee_);
 
         ITMToken(token).mint(address(this), maxSupply);
+        // forge-lint: disable-next-line(unsafe-typecast)
         _reserve0 = uint128(maxSupply);
 
         return true;
@@ -207,9 +210,11 @@ contract TMMarket is ITMMarket {
         override
         returns (int256 amount0, int256 amount1)
     {
+        // forge-lint: disable-next-line(unsafe-typecast)
         (, uint256 amountIn, uint256 amountOut,) =
             _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         return zeroForOne ? (int256(amountIn), -int256(amountOut)) : (-int256(amountOut), int256(amountIn));
     }
 
@@ -250,26 +255,33 @@ contract TMMarket is ITMMarket {
         uint256 feeAmount1;
         unchecked {
             if (zeroForOne) {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount0 = int256(amountIn);
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount1 = -int256(amountOut);
 
                 reserve0 = Math.addDelta128(reserve0, amount0);
                 reserve1 = Math.addDelta128(reserve1, amount1);
 
                 if (reserve0 > IERC20(_token0).balanceOf(address(this))) revert InsufficientBalance0();
+                // forge-lint: disable-next-line(unsafe-typecast)
                 IERC20(token1).safeTransfer(to, uint256(-amount1));
 
                 // Swap fee0 to fee1
                 (nextSqrtRatioX96,, feeAmount1,) =
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0);
             } else {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount0 = -int256(amountOut);
+                // forge-lint: disable-next-line(unsafe-typecast)
                 amount1 = int256(amountIn);
 
                 reserve1 = Math.addDelta128(reserve1, amount1);
                 reserve0 = Math.addDelta128(reserve0, amount0);
 
                 if (reserve1 > IERC20(token1).balanceOf(address(this))) revert InsufficientBalance1();
+                // forge-lint: disable-next-line(unsafe-typecast)
                 IERC20(_token0).safeTransfer(to, uint256(-amount0));
 
                 feeAmount1 = feeAmountIn;
@@ -278,6 +290,7 @@ contract TMMarket is ITMMarket {
             emit Swap(msg.sender, to, amount0, amount1, feeAmountIn, feeAmount1, nextSqrtRatioX96);
 
             if (feeAmount1 > 0) {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 reserve1 = Math.addDelta128(reserve1, -int256(feeAmount1));
 
                 IERC20(token1).safeTransfer(factory, feeAmount1);
@@ -285,8 +298,11 @@ contract TMMarket is ITMMarket {
             }
         }
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         _sqrtRatioX96 = uint128(nextSqrtRatioX96);
+        // forge-lint: disable-next-line(unsafe-typecast)
         _reserve0 = uint128(reserve0);
+        // forge-lint: disable-next-line(unsafe-typecast)
         _reserve1 = uint128(reserve1);
     }
 
@@ -306,21 +322,19 @@ contract TMMarket is ITMMarket {
         uint256 currentSqrtRatioX96,
         uint256 fee
     ) internal view returns (uint256 nextSqrtRatioX96, uint256 amountIn, uint256 amountOut, uint256 feeAmountIn) {
-        if (
-            zeroForOne
+        if (zeroForOne
                 ? sqrtRatioLimitX96 >= currentSqrtRatioX96 || sqrtRatioLimitX96 < sqrtRatioAX96
-                : sqrtRatioLimitX96 <= currentSqrtRatioX96 || sqrtRatioLimitX96 > sqrtRatioMaxX96
-        ) revert InvalidSqrtRatioLimit();
+                : sqrtRatioLimitX96 <= currentSqrtRatioX96 || sqrtRatioLimitX96 > sqrtRatioMaxX96) revert InvalidSqrtRatioLimit();
         if (Math.safeInt128(deltaAmount) == 0) return (currentSqrtRatioX96, 0, 0, 0);
 
         // First pool
         {
             uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
-            uint256 targetRatioX96 = (
-                zeroForOne
-                    ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
-                    : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96
-            ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
+            uint256 targetRatioX96 = (zeroForOne
+                        ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                        : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+                ? sqrtRatioBX96
+                : sqrtRatioLimitX96;
 
             (nextSqrtRatioX96, amountIn, amountOut, feeAmountIn) =
                 SwapMath.getDeltaAmounts(currentSqrtRatioX96, targetRatioX96, liquidity, deltaAmount, fee);

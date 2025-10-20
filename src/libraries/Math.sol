@@ -24,6 +24,7 @@ library Math {
      */
     function safeInt128(int256 x) internal pure returns (int256) {
         unchecked {
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (uint256(x) + 2 ** 127 >= 2 ** 128) revert Int128Overflow();
             return x;
         }
@@ -52,6 +53,7 @@ library Math {
      * - `x` must fit into a int256
      */
     function toInt256(uint256 x) internal pure returns (int256) {
+        // forge-lint: disable-next-line(unsafe-typecast)
         if (int256(x) >= 0) return int256(x);
         revert Int256Overflow();
     }
@@ -67,6 +69,7 @@ library Math {
      */
     function addDelta128(uint256 x, int256 delta) internal pure returns (uint256 z) {
         unchecked {
+            // forge-lint: disable-next-line(unsafe-typecast)
             z = x + uint256(delta);
             if ((z | x) >= 2 ** 128) revert AddDeltaOverflow();
         }
@@ -123,11 +126,10 @@ library Math {
                     inv := mul(inv, sub(2, mul(d, inv)))
                     inv := mul(inv, sub(2, mul(d, inv)))
                     inv := mul(inv, sub(2, mul(d, inv)))
-                    z :=
-                        mul(
-                            or(mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)), div(sub(z, r), t)),
-                            mul(sub(2, mul(d, inv)), inv)
-                        )
+                    z := mul(
+                        or(mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)), div(sub(z, r), t)),
+                        mul(sub(2, mul(d, inv)), inv)
+                    )
                     break
                 }
                 z := div(z, d)

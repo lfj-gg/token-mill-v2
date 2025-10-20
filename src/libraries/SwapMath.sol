@@ -1,4 +1,4 @@
-    // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import {Math} from "./Math.sol";
@@ -51,14 +51,18 @@ library SwapMath {
 
         unchecked {
             if (deltaAmount > 0) {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256 remainingAmountIn = uint256(deltaAmount) * (MAX_FEE - fee) / (MAX_FEE);
                 amountIn = getAmountIn(sqrtRatioX96, sqrtTargetRatioX96, liquidity, true);
 
                 if (amountIn > remainingAmountIn) {
                     sqrtNextX96 = sqrtRatioX96 > sqrtTargetRatioX96
+                        // forge-lint: disable-next-line(unsafe-typecast)
                         ? getNextSqrtRatioFromAmount0(sqrtRatioX96, liquidity, int256(remainingAmountIn))
+                        // forge-lint: disable-next-line(unsafe-typecast)
                         : getNextSqrtRatioFromAmount1(sqrtRatioX96, liquidity, int256(remainingAmountIn));
                     amountIn = getAmountIn(sqrtRatioX96, sqrtNextX96, liquidity, true);
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     feeAmountIn = uint256(deltaAmount) - amountIn;
                 } else {
                     sqrtNextX96 = sqrtTargetRatioX96;
@@ -69,6 +73,7 @@ library SwapMath {
             } else {
                 if (deltaAmount == 0) return (sqrtRatioX96, 0, 0, 0);
 
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256 remainingAmountOut = uint256(-deltaAmount);
                 amountOut = getAmountOut(sqrtRatioX96, sqrtTargetRatioX96, liquidity, false);
 
@@ -187,10 +192,12 @@ library SwapMath {
     {
         liquidity <<= 96; // `liquidity << 96` can't overflow as it's a uint127
         unchecked {
+            // forge-lint: disable-next-line(unsafe-typecast)
             int256 denominator = int256(liquidity) + amount0 * int256(sqrtRatioX96); // `amount0 * sqrtRatioX96` can't
-                // overflow as it's a int128 * uint128
+            // overflow as it's a int128 * uint128
             if (denominator <= 0) revert LiquidityOverflow0();
 
+            // forge-lint: disable-next-line(unsafe-typecast)
             return Math.fullMulDivUp(liquidity, sqrtRatioX96, uint256(denominator));
         }
     }
@@ -218,9 +225,12 @@ library SwapMath {
     {
         unchecked {
             // `sqrtRatioX96 * liquidity` can't overflow as it's a uint127 * uint127, it fits in int256
+            // forge-lint: disable-next-line(unsafe-typecast)
             int256 numerator = int256(sqrtRatioX96 * liquidity) + (amount1 << 96); // `amount1 << 96` can't overflow as
-                // it's a int128
+            // it's a int128
             if (numerator <= 0) revert LiquidityOverflow1();
+
+            // forge-lint: disable-next-line(unsafe-typecast)
             return uint256(numerator) / liquidity;
         }
     }
