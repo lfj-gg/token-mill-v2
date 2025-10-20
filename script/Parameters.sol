@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 contract Parameters {
     address internal quoteToken = 0x0000000000000000000000000000000000000000;
-    uint256 internal defaultProtocolFeeShare = 0.25e6; // 20%
+    uint256 internal defaultProtocolFeeShare = 0.25e6; // 25%
     uint256 internal defaultMinUpdateTime = 1 hours;
     uint256 internal defaultFee = 0.02e6; // 2%
     uint256 internal sqrtPrice0 = _sqrtX96(0.000_000_028e18); // 2.8e-8
