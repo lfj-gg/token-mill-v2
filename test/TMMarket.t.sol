@@ -42,9 +42,8 @@ contract TestTMMarket is Test, Parameters {
             )
         );
 
-        (token, market) = ITMFactory(factory).createMarket(
-            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
-        );
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
     }
 
     function test_Fuzz_TargetRatio(uint256 currentSqrtRatioX96, bool zeroForOne, uint256 sqrtRatioLimitX96)
@@ -62,11 +61,11 @@ contract TestTMMarket is Test, Parameters {
             : bound(sqrtRatioLimitX96, currentSqrtRatioX96 + 1, sqrtRatioCX96);
 
         uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
-        uint256 targetRatioX96 = (
-            zeroForOne
-                ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
-                : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96
-        ) ? sqrtRatioBX96 : sqrtRatioLimitX96;
+        uint256 targetRatioX96 = (zeroForOne
+                    ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                    : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+            ? sqrtRatioBX96
+            : sqrtRatioLimitX96;
 
         if (currentSqrtRatioX96 >= sqrtRatioBX96) {
             assertEq(liquidity, liquidityB, "test_Fuzz_TargetRatio::1");
@@ -469,9 +468,8 @@ contract TestTMMarket is Test, Parameters {
         vm.prank(admin);
         ITMFactory(factory).setDefaultFee(0);
 
-        (token, market) = ITMFactory(factory).createMarket(
-            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
-        );
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
@@ -552,9 +550,8 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_Swap_ZeroForOne_Lt0_WithFees(uint256 before, uint256 amountA, uint256 amountB) public {
-        (token, market) = ITMFactory(factory).createMarket(
-            "Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT()
-        );
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
