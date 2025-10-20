@@ -16,7 +16,8 @@ exclude_lints = [
     "screaming-snake-case-immutable",
     "mixed-case-function",
     "mixed-case-variable",
-    "screaming-snake-case-const"
+    "screaming-snake-case-const",
 ]
+ignore = ["**/*.t.sol"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
