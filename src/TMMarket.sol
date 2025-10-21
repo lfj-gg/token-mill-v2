@@ -35,7 +35,6 @@ contract TMMarket is ITMMarket {
     uint256 private immutable maxSupply;
 
     address private _token0; // Base token
-
     bool private _isMigrated;
 
     uint128 private _sqrtRatioX96; // Current price
