@@ -252,7 +252,6 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
     /**
      * @dev Migrates the liquidity of the {market} to the {recipient}.
-     * The market contract will emit a {Migrated} event with the recipient, amount0 and amount1.
      *
      * Requirements:
      *
