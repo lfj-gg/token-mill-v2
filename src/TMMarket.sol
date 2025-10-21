@@ -36,14 +36,14 @@ contract TMMarket is ITMMarket {
 
     address private _token0; // Base token
 
+    bool private _isMigrated;
+
     uint128 private _sqrtRatioX96; // Current price
     uint64 private _fee;
     uint64 private _state;
 
     uint128 private _reserve0;
     uint128 private _reserve1;
-
-    bool private _isMigrated;
 
     modifier nonReentrant() {
         if (_state == 1) revert ReentrantCall();
@@ -219,6 +219,8 @@ contract TMMarket is ITMMarket {
         override
         returns (int256 amount0, int256 amount1)
     {
+        if (_isMigrated) revert MarketMigrated();
+
         // forge-lint: disable-next-line(unsafe-typecast)
         (, uint256 amountIn, uint256 amountOut,) =
             _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
@@ -278,9 +280,9 @@ contract TMMarket is ITMMarket {
                 IERC20(token1).safeTransfer(to, uint256(-amount1));
 
                 // Swap fee0 to fee1
+                // forge-lint: disable-next-item(unsafe-typecast)
                 (nextSqrtRatioX96,, feeAmount1,) =
-                // forge-lint: disable-next-line(unsafe-typecast)
-                _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0);
+                    _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0);
             } else {
                 // forge-lint: disable-next-line(unsafe-typecast)
                 amount0 = -int256(amountOut);
