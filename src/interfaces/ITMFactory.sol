@@ -29,6 +29,9 @@ interface ITMFactory {
         address indexed market, address indexed token, address indexed feeRecipient, uint256 fee, uint256 protocolFee
     );
     event MinUpdateTimeSet(address indexed sender, uint256 minUpdateTime);
+    event MarketMigrated(
+        address indexed sender, address indexed market, address indexed recipient, uint256 amount0, uint256 amount1
+    );
 
     struct MarketDetails {
         bool initialized;
@@ -55,6 +58,8 @@ interface ITMFactory {
     function PROTOCOL_FEE_RECIPIENT() external view returns (address);
 
     function PROTOCOL_FEE_COLLECTOR_ROLE() external view returns (bytes32);
+
+    function MARKET_MIGRATOR_ROLE() external view returns (bytes32);
 
     function getMarketImplementation(address quoteToken) external view returns (address);
 
@@ -91,6 +96,8 @@ interface ITMFactory {
     function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
         external
         returns (address token, address market);
+
+    function migrateMarket(address market, address recipient) external returns (uint256 amount0, uint256 amount1);
 
     function collect(address token, address account, address recipient, uint256 amount) external returns (bool);
 

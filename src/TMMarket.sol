@@ -43,6 +43,8 @@ contract TMMarket is ITMMarket {
     uint128 private _reserve0;
     uint128 private _reserve1;
 
+    bool private _isMigrated;
+
     modifier nonReentrant() {
         if (_state == 1) revert ReentrantCall();
         _state = 1;
@@ -187,6 +189,13 @@ contract TMMarket is ITMMarket {
     }
 
     /**
+     * @dev Returns whether the market has been migrated.
+     */
+    function getIsMigrated() external view returns (bool) {
+        return _isMigrated;
+    }
+
+    /**
      * @dev Returns the amount of token0 and token1 that will be swapped given a delta amount.
      * If zeroForOne is true, the input is token0 and the output is token1.
      * If zeroForOne is false, the input is token1 and the output is token0.
@@ -244,6 +253,7 @@ contract TMMarket is ITMMarket {
         returns (int256 amount0, int256 amount1)
     {
         if (deltaAmount == 0) revert ZeroDeltaAmount();
+        if (_isMigrated) revert MarketMigrated();
 
         (uint256 nextSqrtRatioX96, uint256 amountIn, uint256 amountOut, uint256 feeAmountIn) =
             _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
@@ -304,6 +314,36 @@ contract TMMarket is ITMMarket {
         _reserve0 = uint128(reserve0);
         // forge-lint: disable-next-line(unsafe-typecast)
         _reserve1 = uint128(reserve1);
+    }
+
+    /**
+     * @dev Migrates all tokens in the market to the {recipient}.
+     * The function will transfer all the token0 and token1 held by the market to the recipient.
+     * The market will be marked as migrated and no further swaps will be possible.
+     *
+     * Requirements:
+     *
+     * - The caller must be the factory
+     * - The market must not have been migrated yet
+     */
+    function migrate(address recipient) external override nonReentrant returns (uint256 amount0, uint256 amount1) {
+        if (msg.sender != factory) revert OnlyFactory();
+        if (_isMigrated) revert MarketMigrated();
+
+        address token0 = _token0;
+        address token1 = quoteToken;
+
+        amount0 = IERC20(token0).balanceOf(address(this));
+        if (amount0 > 0) {
+            IERC20(token0).safeTransfer(recipient, amount0);
+        }
+
+        amount1 = IERC20(token1).balanceOf(address(this));
+        if (amount1 > 0) {
+            IERC20(token1).safeTransfer(recipient, amount1);
+        }
+
+        _isMigrated = true;
     }
 
     /**

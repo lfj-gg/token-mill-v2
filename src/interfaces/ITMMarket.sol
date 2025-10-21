@@ -14,6 +14,8 @@ interface ITMMarket {
     error InsufficientBalance0();
     error InsufficientBalance1();
     error InvalidSqrtRatioLimit();
+    error OnlyFactory();
+    error MarketMigrated();
 
     event Swap(
         address indexed sender,
@@ -53,4 +55,6 @@ interface ITMMarket {
     function swap(address to, bool zeroForOne, int256 deltaAmount, uint256 sqrtRatioLimitX96)
         external
         returns (int256 amount0, int256 amount1);
+
+    function migrate(address recipient) external returns (uint256 amount0, uint256 amount1);
 }
