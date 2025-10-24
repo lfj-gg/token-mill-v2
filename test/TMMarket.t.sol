@@ -35,7 +35,8 @@ contract TestTMMarket is Test, Parameters {
             new TMFactory(
                 defaultMinUpdateTime,
                 defaultProtocolFeeShare,
-                defaultFee,
+                defaultFeeA,
+                defaultFeeB,
                 quoteToken,
                 marketImplementation,
                 tokenImplementation,
@@ -121,13 +122,15 @@ contract TestTMMarket is Test, Parameters {
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Constructor::7");
         assertEq(ITMMarket(market).getQuoteToken(), quoteToken, "test_Constructor::8");
         assertEq(ITMMarket(market).getCurrentSqrtRatio(), sqrtPrice0, "test_Constructor::9");
-        assertEq(ITMMarket(market).getFee(), defaultFee, "test_Constructor::10");
+        (uint256 feeA, uint256 feeB) = ITMMarket(market).getFees();
+        assertEq(feeA, defaultFeeA, "test_Constructor::10");
+        assertEq(feeB, defaultFeeB, "test_Constructor::11");
         (uint256 reserve0, uint256 reserve1) = ITMMarket(market).getReserves();
-        assertEq(reserve0, amount0A + amount0B, "test_Constructor::11");
-        assertEq(reserve1, 0, "test_Constructor::12");
-        assertEq(ITMToken(token).getFactory(), factory, "test_Constructor::13");
-        assertEq(ITMToken(token).totalSupply(), amount0A + amount0B, "test_Constructor::14");
-        assertEq(ITMToken(token).balanceOf(market), amount0A + amount0B, "test_Constructor::15");
+        assertEq(reserve0, amount0A + amount0B, "test_Constructor::12");
+        assertEq(reserve1, 0, "test_Constructor::13");
+        assertEq(ITMToken(token).getFactory(), factory, "test_Constructor::14");
+        assertEq(ITMToken(token).totalSupply(), amount0A + amount0B, "test_Constructor::15");
+        assertEq(ITMToken(token).balanceOf(market), amount0A + amount0B, "test_Constructor::16");
     }
 
     function test_Fuzz_Revert_Constructor(uint256 amountA, uint256 amountB, uint256 sqrtPriceA, uint256 sqrtPriceB)
@@ -179,15 +182,18 @@ contract TestTMMarket is Test, Parameters {
 
     function test_Revert_Initialize() public {
         vm.expectRevert(ITMMarket.AlreadyInitialized.selector);
-        ITMMarket(market).initialize(address(0), 0);
+        ITMMarket(market).initialize(address(0), 0, 0);
 
         vm.store(market, PRICE_SLOT, 0);
 
         vm.expectRevert(ITMMarket.SameTokens.selector);
-        ITMMarket(market).initialize(quoteToken, 0);
+        ITMMarket(market).initialize(quoteToken, 0, 0);
 
         vm.expectRevert(ITMMarket.InvalidFee.selector);
-        ITMMarket(market).initialize(address(1), SwapMath.MAX_FEE + 1);
+        ITMMarket(market).initialize(address(1), SwapMath.MAX_FEE + 1, 0);
+
+        vm.expectRevert(ITMMarket.InvalidFee.selector);
+        ITMMarket(market).initialize(address(1), 0, SwapMath.MAX_FEE + 1);
     }
 
     function test_revert_GetDeltaAmountsAndSwap() public {
@@ -467,7 +473,7 @@ contract TestTMMarket is Test, Parameters {
     function test_Fuzz_Swap_ZeroForOne_Lt0_NoFees(uint256 before, uint256 amountA, uint256 amountB) public {
         // Set default fee to 0 to fully validate invariants 16
         vm.prank(admin);
-        ITMFactory(factory).setDefaultFee(0);
+        ITMFactory(factory).setDefaultFees(0, 0);
 
         (token, market) = ITMFactory(factory)
             .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());

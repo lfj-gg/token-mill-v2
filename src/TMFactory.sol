@@ -42,7 +42,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
     uint88 private _minUpdateTime;
     uint64 private _protocolFeeShare;
-    uint64 private _defaultFee;
+    uint32 private _defaultFeeA;
+    uint32 private _defaultFeeB;
 
     mapping(address token => mapping(address account => uint256 unclaimedFees)) private _unclaimedFees;
     mapping(address market => MarketDetails) private _details;
@@ -54,31 +55,40 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     mapping(address creator => EnumerableSet.AddressSet) private _marketsByCreator;
 
     /**
-     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {quoteToken} to
+     * @dev Sets the initial values for {minUpdateTime}, {protocolFeeShare}, {defaultFeeA}, {defaultFeeB}, {quoteToken} to
      * {marketImplementation}, {tokenImplementation} and {admin}.
      */
     constructor(
         uint256 minUpdateTime,
         uint256 protocolFeeShare,
-        uint256 defaultFee,
+        uint256 defaultFeeA,
+        uint256 defaultFeeB,
         address quoteToken,
         address marketImplementation,
         address tokenImplementation,
         address admin
     ) {
         initialize(
-            minUpdateTime, protocolFeeShare, defaultFee, quoteToken, marketImplementation, tokenImplementation, admin
+            minUpdateTime,
+            protocolFeeShare,
+            defaultFeeA,
+            defaultFeeB,
+            quoteToken,
+            marketImplementation,
+            tokenImplementation,
+            admin
         );
     }
 
     /**
-     * @dev Initializes the contract with {minUpdateTime}, {protocolFeeShare}, {defaultFee}, {marketImplementation},
+     * @dev Initializes the contract with {minUpdateTime}, {protocolFeeShare}, {defaultFeeA}, {defaultFeeB}, {marketImplementation},
      * {tokenImplementation} and {admin}.
      */
     function initialize(
         uint256 minUpdateTime,
         uint256 protocolFeeShare,
-        uint256 defaultFee,
+        uint256 defaultFeeA,
+        uint256 defaultFeeB,
         address quoteToken,
         address marketImplementation,
         address tokenImplementation,
@@ -89,7 +99,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
         _setMinUpdateTime(minUpdateTime);
         _setProtocolFeeShare(protocolFeeShare);
-        _setDefaultFee(defaultFee);
+        _setDefaultFees(defaultFeeA, defaultFeeB);
 
         _setMarketImplementation(quoteToken, marketImplementation);
         _setTokenImplementation(tokenImplementation);
@@ -131,10 +141,10 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Returns the default fee.
+     * @dev Returns the default fees.
      */
-    function getDefaultFee() external view override returns (uint256) {
-        return _defaultFee;
+    function getDefaultFees() external view override returns (uint256, uint256) {
+        return (_defaultFeeA, _defaultFeeB);
     }
 
     /**
@@ -402,16 +412,22 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Updates the {defaultFee} that will be used by newly created markets.
-     * Emits a {DefaultFeeSet} event with the sender and the {defaultFee}.
+     * @dev Updates {defaultFeeA} and {defaultFeeB} that will be used by newly created markets.
+     * Emits a {DefaultFeesSet} event with the sender and the {defaultFeeA} and {defaultFeeB}.
      *
      * Requirements:
      *
-     * - The {defaultFee} must be less than or equal to the maximum fee.
+     * - {defaultFeeA} must be less than or equal to the maximum fee.
+     * - {defaultFeeB} must be less than or equal to the maximum fee.
      * - The caller must have the DEFAULT_ADMIN_ROLE.
      */
-    function setDefaultFee(uint256 defaultFee) external override onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        _setDefaultFee(defaultFee);
+    function setDefaultFees(uint256 defaultFeeA, uint256 defaultFeeB)
+        external
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        returns (bool)
+    {
+        _setDefaultFees(defaultFeeA, defaultFeeB);
         return true;
     }
 
@@ -505,7 +521,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _marketOf[token] = market;
 
         ITMToken(token).initialize(name, symbol);
-        ITMMarket(market).initialize(token, _defaultFee);
+        ITMMarket(market).initialize(token, _defaultFeeA, _defaultFeeB);
     }
 
     /**
@@ -539,20 +555,23 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     }
 
     /**
-     * @dev Helper function to set the {defaultFee}.
-     * Emits a {DefaultFeeSet} event with the sender and the {defaultFee}.
+     * @dev Helper function to set {defaultFeeA} and {defaultFeeB}.
+     * Emits a {DefaultFeesSet} event with the sender and the {defaultFeeA} and {defaultFeeB}.
      *
      * Requirements:
      *
-     * - The {defaultFee} must be less than or equal to the maximum fee.
+     * - {defaultFeeA} must be less than or equal to the maximum fee.
+     * - {defaultFeeB} must be less than or equal to the maximum fee.
      */
-    function _setDefaultFee(uint256 defaultFee) internal {
-        if (defaultFee > SwapMath.MAX_FEE) revert InvalidFee();
+    function _setDefaultFees(uint256 defaultFeeA, uint256 defaultFeeB) internal {
+        if (defaultFeeA > SwapMath.MAX_FEE || defaultFeeB > SwapMath.MAX_FEE) revert InvalidFee();
 
         // forge-lint: disable-next-line(unsafe-typecast)
-        _defaultFee = uint64(defaultFee);
+        _defaultFeeA = uint32(defaultFeeA);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _defaultFeeB = uint32(defaultFeeB);
 
-        emit DefaultFeeSet(msg.sender, defaultFee);
+        emit DefaultFeesSet(msg.sender, defaultFeeA, defaultFeeB);
     }
 
     /**

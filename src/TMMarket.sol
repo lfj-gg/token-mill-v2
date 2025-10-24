@@ -38,7 +38,8 @@ contract TMMarket is ITMMarket {
     bool private _isMigrated;
 
     uint128 private _sqrtRatioX96; // Current price
-    uint64 private _fee;
+    uint32 private _feeA;
+    uint32 private _feeB;
     uint64 private _state;
 
     uint128 private _reserve0;
@@ -99,8 +100,8 @@ contract TMMarket is ITMMarket {
     }
 
     /**
-     * @dev Initializes the contract with {token0_}, and {fee_}.
-     * The fee must be less than or equal to SwapMath.MAX_FEE.
+     * @dev Initializes the contract with {token0_}, {feeA_} and {feeB_}.
+     * The fees must be less than or equal to SwapMath.MAX_FEE.
      * The market will mint the maximum supply of token0 and set the reserve0 to the maximum supply.
      *
      * Requirements:
@@ -109,17 +110,19 @@ contract TMMarket is ITMMarket {
      * - The tokens must be different
      * - The fee must be less than or equal to SwapMath.MAX_FEE
      */
-    function initialize(address token, uint256 fee_) external override returns (bool) {
+    function initialize(address token, uint256 feeA_, uint256 feeB_) external override returns (bool) {
         if (_sqrtRatioX96 != 0) revert AlreadyInitialized();
         if (token == quoteToken) revert SameTokens();
-        if (fee_ > SwapMath.MAX_FEE) revert InvalidFee();
+        if (feeA_ > SwapMath.MAX_FEE || feeB_ > SwapMath.MAX_FEE) revert InvalidFee();
 
         _token0 = token;
 
         // forge-lint: disable-next-line(unsafe-typecast)
         _sqrtRatioX96 = uint128(sqrtRatioAX96);
         // forge-lint: disable-next-line(unsafe-typecast)
-        _fee = uint64(fee_);
+        _feeA = uint32(feeA_);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        _feeB = uint32(feeB_);
 
         ITMToken(token).mint(address(this), maxSupply);
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -174,10 +177,10 @@ contract TMMarket is ITMMarket {
     }
 
     /**
-     * @dev Returns the fee of the market (in millionths).
+     * @dev Returns the fees of the market (in millionths).
      */
-    function getFee() external view override returns (uint256) {
-        return _fee;
+    function getFees() external view override returns (uint256, uint256) {
+        return (_feeA, _feeB);
     }
 
     /**
@@ -222,7 +225,7 @@ contract TMMarket is ITMMarket {
 
         // forge-lint: disable-next-line(unsafe-typecast)
         (, uint256 amountIn, uint256 amountOut,) =
-            _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
+            _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _feeA, _feeB);
 
         // forge-lint: disable-next-line(unsafe-typecast)
         return zeroForOne ? (int256(amountIn), -int256(amountOut)) : (-int256(amountOut), int256(amountIn));
@@ -257,7 +260,7 @@ contract TMMarket is ITMMarket {
         if (_isMigrated) revert MarketMigrated();
 
         (uint256 nextSqrtRatioX96, uint256 amountIn, uint256 amountOut, uint256 feeAmountIn) =
-            _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _fee);
+            _getDeltaAmounts(zeroForOne, deltaAmount, sqrtRatioLimitX96, _sqrtRatioX96, _feeA, _feeB);
 
         address token1 = quoteToken;
         uint256 reserve0 = _reserve0;
@@ -281,7 +284,7 @@ contract TMMarket is ITMMarket {
                 // Swap fee0 to fee1
                 // forge-lint: disable-next-item(unsafe-typecast)
                 (nextSqrtRatioX96,, feeAmount1,) =
-                    _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0);
+                    _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0, 0);
             } else {
                 // forge-lint: disable-next-line(unsafe-typecast)
                 amount0 = -int256(amountOut);
@@ -361,7 +364,8 @@ contract TMMarket is ITMMarket {
         int256 deltaAmount,
         uint256 sqrtRatioLimitX96,
         uint256 currentSqrtRatioX96,
-        uint256 fee
+        uint256 feeA,
+        uint256 feeB
     ) internal view returns (uint256 nextSqrtRatioX96, uint256 amountIn, uint256 amountOut, uint256 feeAmountIn) {
         if (zeroForOne
                 ? sqrtRatioLimitX96 >= currentSqrtRatioX96 || sqrtRatioLimitX96 < sqrtRatioAX96
@@ -370,7 +374,8 @@ contract TMMarket is ITMMarket {
 
         // First pool
         {
-            uint256 liquidity = currentSqrtRatioX96 >= sqrtRatioBX96 ? liquidityB : liquidityA;
+            (uint256 liquidity, uint256 fee) =
+                currentSqrtRatioX96 >= sqrtRatioBX96 ? (liquidityB, feeB) : (liquidityA, feeA);
             uint256 targetRatioX96 = (zeroForOne
                         ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
                         : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
@@ -387,7 +392,8 @@ contract TMMarket is ITMMarket {
 
         // Second pool
         if (deltaAmount != 0 && nextSqrtRatioX96 != sqrtRatioLimitX96) {
-            uint256 liquidity = sqrtRatioLimitX96 > sqrtRatioBX96 ? liquidityB : liquidityA;
+            (uint256 liquidity, uint256 fee) =
+                sqrtRatioLimitX96 > sqrtRatioBX96 ? (liquidityB, feeB) : (liquidityA, feeA);
 
             uint256 amountIn_;
             uint256 amountOut_;

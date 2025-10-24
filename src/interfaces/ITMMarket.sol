@@ -27,7 +27,7 @@ interface ITMMarket {
         uint256 sqrtRatioX96
     );
 
-    function initialize(address token0, uint256 fee) external returns (bool);
+    function initialize(address token0, uint256 feeA, uint256 feeB) external returns (bool);
 
     function getFactory() external view returns (address);
 
@@ -44,7 +44,7 @@ interface ITMMarket {
 
     function getCurrentSqrtRatio() external view returns (uint256 sqrtRatioX96);
 
-    function getFee() external view returns (uint256);
+    function getFees() external view returns (uint256 feeA, uint256 feeB);
 
     function getReserves() external view returns (uint256 reserve0, uint256 reserve1);
 
