@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 
 import {Parameters} from "script/Parameters.sol";
 import {ITMFactory, TMFactory} from "src/TMFactory.sol";
@@ -22,6 +22,14 @@ contract TestTMMarket is Test, Parameters {
     address admin = makeAddr("admin");
 
     bytes32 constant PRICE_SLOT = bytes32(uint256(1));
+
+    struct SwapEvent {
+        int256 amount0;
+        int256 amount1;
+        uint256 feeAmountIn;
+        uint256 feeAmount1;
+        uint256 sqrtRatioX96;
+    }
 
     function setUp() public {
         quoteToken = address(new MockERC20());
@@ -642,6 +650,136 @@ contract TestTMMarket is Test, Parameters {
             "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::16"
         );
         assertLe(_abs(amountA1) + _abs(amountB1), _abs(amountAB1), "test_Fuzz_Swap_ZeroForOne_Lt0_WithFees::17");
+    }
+
+    function test_Fuzz_FeeSwitch_Lt0(uint256 supplyBefore, uint256 supplyBoughtInB) public {
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+
+        supplyBefore = bound(supplyBefore, 1, amount0A - 1);
+        supplyBoughtInB = bound(supplyBoughtInB, 1, amount0B);
+
+        {
+            (, int256 amount1) = ITMMarket(market).getDeltaAmounts(false, -int256(supplyBefore), 2 ** 127 - 1);
+
+            MockERC20(quoteToken).mint(market, uint256(amount1));
+            ITMMarket(market).swap(address(this), false, -int256(supplyBefore), 2 ** 127 - 1);
+        }
+
+        uint256 snapshotId = vm.snapshotState();
+        vm.recordLogs();
+
+        uint256 feeAmountA;
+        (, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, -int256(amount0A - supplyBefore), 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountA1));
+            (, int256 amountA1_) =
+                ITMMarket(market).swap(address(1), false, -int256(amount0A - supplyBefore), 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountA = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+
+            assertApproxEqAbs(
+                feeAmountA, (_abs(amountA1_) * defaultFeeA + 1e6 - 1) / 1e6, 1, "test_Fuzz_FeeSwitch_Lt0::1"
+            );
+        }
+
+        uint256 feeAmountB;
+        (, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, -int256(supplyBoughtInB), 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountB1));
+            (, int256 amountB1_) = ITMMarket(market).swap(address(1), false, -int256(supplyBoughtInB), 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountB = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+
+            assertApproxEqAbs(
+                feeAmountB, (_abs(amountB1_) * defaultFeeB + 1e6 - 1) / 1e6, 1, "test_Fuzz_FeeSwitch_Lt0::2"
+            );
+        }
+
+        require(vm.revertToStateAndDelete(snapshotId), "panic");
+        uint256 buyAmount = amount0A - supplyBefore + supplyBoughtInB;
+
+        uint256 feeAmountAB;
+        (, int256 amountAB1) = ITMMarket(market).getDeltaAmounts(false, -int256(buyAmount), 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountAB1));
+            ITMMarket(market).swap(address(1), false, -int256(buyAmount), 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountAB = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+        }
+
+        assertGe(feeAmountA + feeAmountB, feeAmountAB, "test_Fuzz_FeeSwitch_Lt0::3");
+        assertApproxEqAbs(feeAmountA + feeAmountB, feeAmountAB, 1e6, "test_Fuzz_FeeSwitch_Lt0::4");
+    }
+
+    function test_Fuzz_FeeSwitch_Gt0(uint256 supplyBefore, uint256 supplyBoughtInB) public {
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+
+        supplyBefore = bound(supplyBefore, 1, amount0A - 1);
+        supplyBoughtInB = bound(supplyBoughtInB, 1, amount0B - 1);
+
+        {
+            (, int256 amount1) = ITMMarket(market).getDeltaAmounts(false, -int256(supplyBefore), 2 ** 127 - 1);
+
+            MockERC20(quoteToken).mint(market, uint256(amount1));
+            ITMMarket(market).swap(address(this), false, -int256(supplyBefore), 2 ** 127 - 1);
+        }
+
+        uint256 snapshotId = vm.snapshotState();
+        vm.recordLogs();
+
+        uint256 feeAmountA;
+        (, int256 amountA1) = ITMMarket(market).getDeltaAmounts(false, -int256(amount0A - supplyBefore), 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountA1));
+            (, int256 amountA1_) = ITMMarket(market).swap(address(1), false, amountA1, 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountA = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+
+            assertApproxEqAbs(
+                feeAmountA, (_abs(amountA1_) * defaultFeeA + 1e6 - 1) / 1e6, 2, "test_Fuzz_FeeSwitch_Gt0::1"
+            );
+        }
+
+        uint256 feeAmountB;
+        (, int256 amountB1) = ITMMarket(market).getDeltaAmounts(false, -int256(supplyBoughtInB), 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountB1));
+            (, int256 amountB1_) = ITMMarket(market).swap(address(1), false, amountB1, 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountB = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+
+            assertApproxEqAbs(
+                feeAmountB, (_abs(amountB1_) * defaultFeeB + 1e6 - 1) / 1e6, 2, "test_Fuzz_FeeSwitch_Gt0::2"
+            );
+        }
+
+        require(vm.revertToStateAndDelete(snapshotId), "panic");
+
+        uint256 feeAmountAB;
+        (, int256 amountAB1) = ITMMarket(market).getDeltaAmounts(false, amountA1 + amountB1, 2 ** 127 - 1);
+
+        {
+            MockERC20(quoteToken).mint(market, uint256(amountAB1));
+            ITMMarket(market).swap(address(1), false, amountAB1, 2 ** 127 - 1);
+
+            Vm.Log memory swapLog = vm.getRecordedLogs()[2];
+            feeAmountAB = abi.decode(swapLog.data, (SwapEvent)).feeAmount1;
+        }
+
+        assertGe(feeAmountA + feeAmountB, feeAmountAB, "test_Fuzz_FeeSwitch_Gt0::3");
+        assertApproxEqAbs(feeAmountA + feeAmountB, feeAmountAB, 1e6, "test_Fuzz_FeeSwitch_Gt0::4");
     }
 
     function test_Fuzz_Revert_Swap(uint256 before, uint256 amount0, uint256 amount1) public {
