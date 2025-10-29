@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 contract Parameters {
     address internal quoteToken = 0x0000000000000000000000000000000000000000;
+    address internal wnative = 0x0000000000000000000000000000000000000000;
     uint256 internal defaultProtocolFeeShare = 0.25e6; // 25%
     uint256 internal defaultMinUpdateTime = 1 hours;
     uint256 internal defaultFeeA = 0.02e6; // 2%
@@ -11,7 +12,6 @@ contract Parameters {
     uint256 internal sqrtPrice1 = _sqrtX96(0.000_000_38e18); // 3.8e-7
     uint256 internal amount0A = 800_000_000e18; // 800e6
     uint256 internal amount0B = 200_000_000e18; // 200e6
-    address internal wnative = 0x0000000000000000000000000000000000000001;
 
     function _sqrtX96(uint256 x) internal pure returns (uint256 y) {
         uint256 xx = x;
