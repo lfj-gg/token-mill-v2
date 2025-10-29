@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Test} from "forge-std/Test.sol";
 
@@ -677,6 +678,35 @@ contract TestTMMarket is Test, Parameters {
 
         vm.expectRevert(ITMMarket.ReentrantCall.selector);
         ITMMarket(market).swap(address(this), false, 1e18, 2 ** 127 - 1);
+    }
+
+    function test_MarketMigration() public {
+        bytes32 marketMigratorRole = ITMFactory(factory).MARKET_MIGRATOR_ROLE();
+
+        (token, market) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+
+        (int256 amount0, int256 amount1) =
+            ITMMarket(market).getDeltaAmounts(false, -int256(600_000_000e18), 2 ** 127 - 1);
+        MockERC20(quoteToken).mint(market, uint256(amount1));
+        ITMMarket(market).swap(address(this), false, amount0, 2 ** 127 - 1);
+
+        vm.expectRevert(ITMMarket.OnlyFactory.selector);
+        ITMMarket(market).migrate(address(this));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), marketMigratorRole
+            )
+        );
+        ITMFactory(factory).migrateMarket(market, address(this));
+
+        vm.prank(admin);
+        IAccessControl(factory).grantRole(marketMigratorRole, address(this));
+        ITMFactory(factory).migrateMarket(market, address(this));
+
+        vm.expectRevert(ITMMarket.MarketMigrated.selector);
+        ITMMarket(market).swap(address(this), false, amount0, 2 ** 127 - 1);
     }
 
     function onFeeReceived(address, uint256) external returns (bool) {

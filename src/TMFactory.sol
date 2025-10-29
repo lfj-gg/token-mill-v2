@@ -35,6 +35,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     address public constant override PROTOCOL_FEE_RECIPIENT = address(0);
     bytes32 public constant override PROTOCOL_FEE_COLLECTOR_ROLE = keccak256("PROTOCOL_FEE_COLLECTOR_ROLE");
 
+    bytes32 public constant override MARKET_MIGRATOR_ROLE = keccak256("MARKET_MIGRATOR_ROLE");
+
     mapping(address quoteToken => address marketImplementation) private _marketImplementations;
     address private _tokenImplementation;
 
@@ -246,6 +248,24 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
         emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
+    }
+
+    /**
+     * @dev Migrates the liquidity of the {market} to the {recipient}.
+     *
+     * Requirements:
+     *
+     * - The caller must have the POOL_MIGRATOR_ROLE.
+     */
+    function migrateMarket(address market, address recipient)
+        external
+        override
+        onlyRole(MARKET_MIGRATOR_ROLE)
+        returns (uint256 amount0, uint256 amount1)
+    {
+        (amount0, amount1) = ITMMarket(market).migrate(recipient);
+
+        emit MarketMigrated(msg.sender, market, recipient, amount0, amount1);
     }
 
     /**
