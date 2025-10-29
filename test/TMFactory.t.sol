@@ -389,8 +389,9 @@ contract TestTMFactory is Test, Parameters {
         (int256 amount0,) = TMMarket(market).getDeltaAmounts(false, int256(quoteAmountIn), 2 ** 127 - 1);
         uint256 baseAmountOutExpected = uint256(-amount0);
 
-        (,, uint256 baseAmountOut) = TMFactory(factory)
-        .createMarket{value: quoteAmountIn}("Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0);
+        (,, uint256 baseAmountOut) = TMFactory(factory).createMarket{value: quoteAmountIn}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
 
         assertEq(baseAmountOut, baseAmountOutExpected, "test_Fuzz_InitialSwap::1");
 
@@ -405,10 +406,9 @@ contract TestTMFactory is Test, Parameters {
         WNative(wnative).approve(factory, quoteAmountIn);
 
         uint256 balanceBefore = address(this).balance;
-        (,, baseAmountOut) = TMFactory(factory)
-        .createMarket{
-            value: quoteAmountIn - 1
-        }("Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0);
+        (,, baseAmountOut) = TMFactory(factory).createMarket{value: quoteAmountIn - 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
 
         assertEq(baseAmountOut, baseAmountOutExpected, "test_Fuzz_InitialSwap::3");
         assertEq(address(this).balance, balanceBefore, "test_Fuzz_InitialSwap::4");
@@ -433,21 +433,20 @@ contract TestTMFactory is Test, Parameters {
         uint256 baseAmountOutExpected = uint256(-amount0);
 
         vm.expectRevert(ITMFactory.InsufficientOutputAmount.selector);
-        TMFactory(factory)
-        .createMarket{
-            value: quoteAmountIn
-        }("Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, baseAmountOutExpected + 1);
+        TMFactory(factory).createMarket{value: quoteAmountIn}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, baseAmountOutExpected + 1
+        );
 
         vm.expectRevert(ITMFactory.TooManyQuoteTokenSent.selector);
-        TMFactory(factory)
-        .createMarket{value: 2 ** 127 - 1}("Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, 2 ** 127 - 1, 0);
+        TMFactory(factory).createMarket{value: 2 ** 127 - 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, 2 ** 127 - 1, 0
+        );
 
         revertOnFallback = true;
         vm.expectRevert(ITMFactory.TransferFailed.selector);
-        TMFactory(factory)
-        .createMarket{
-            value: quoteAmountIn + 1
-        }("Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0);
+        TMFactory(factory).createMarket{value: quoteAmountIn + 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
     }
 
     function test_Fuzz_Revert_CreateMarket(address quoteToken_, address feeRecipient) public {
