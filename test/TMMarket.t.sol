@@ -48,12 +48,13 @@ contract TestTMMarket is Test, Parameters {
                 quoteToken,
                 marketImplementation,
                 tokenImplementation,
-                admin
+                admin,
+                wnative
             )
         );
 
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
     }
 
     function test_Fuzz_TargetRatio(uint256 currentSqrtRatioX96, bool zeroForOne, uint256 sqrtRatioLimitX96)
@@ -483,8 +484,8 @@ contract TestTMMarket is Test, Parameters {
         vm.prank(admin);
         ITMFactory(factory).setDefaultFees(0, 0);
 
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
@@ -565,8 +566,8 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_Swap_ZeroForOne_Lt0_WithFees(uint256 before, uint256 amountA, uint256 amountB) public {
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
 
         {
             (, int256 maxAmount1) = ITMMarket(market).getDeltaAmounts(false, 2 ** 127 - 1, 2 ** 127 - 1);
@@ -653,8 +654,8 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_FeeSwitch_Lt0(uint256 supplyBefore, uint256 supplyBoughtInB) public {
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
 
         supplyBefore = bound(supplyBefore, 1, amount0A - 1);
         supplyBoughtInB = bound(supplyBoughtInB, 1, amount0B);
@@ -719,8 +720,8 @@ contract TestTMMarket is Test, Parameters {
     }
 
     function test_Fuzz_FeeSwitch_Gt0(uint256 supplyBefore, uint256 supplyBoughtInB) public {
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
 
         supplyBefore = bound(supplyBefore, 1, amount0A - 1);
         supplyBoughtInB = bound(supplyBoughtInB, 1, amount0B - 1);
@@ -827,8 +828,8 @@ contract TestTMMarket is Test, Parameters {
     function test_MarketMigration() public {
         bytes32 marketMigratorRole = ITMFactory(factory).MARKET_MIGRATOR_ROLE();
 
-        (token, market) = ITMFactory(factory)
-            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT());
+        (token, market,) = ITMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, ITMFactory(factory).KOTM_FEE_RECIPIENT(), 0, 0);
 
         (int256 amount0, int256 amount1) =
             ITMMarket(market).getDeltaAmounts(false, -int256(600_000_000e18), 2 ** 127 - 1);
