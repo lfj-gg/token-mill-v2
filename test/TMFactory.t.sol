@@ -19,7 +19,8 @@ contract TestTMFactory is Test {
 
     uint256 defaultProtocolFeeShare = 0.2e6; // 20%
     uint256 defaultMinUpdateTime = 100;
-    uint256 defaultFee = 0.01e6; // 1%
+    uint256 defaultFeeA = 0.01e6; // 1%
+    uint256 defaultFeeB = 0.02e6; // 2%
 
     address admin = makeAddr("admin");
     address quoteToken = makeAddr("quoteToken");
@@ -37,7 +38,8 @@ contract TestTMFactory is Test {
             new TMFactory(
                 defaultMinUpdateTime,
                 defaultProtocolFeeShare,
-                defaultFee,
+                defaultFeeA,
+                defaultFeeB,
                 quoteToken,
                 marketImplementation,
                 tokenImplementation,
@@ -65,14 +67,16 @@ contract TestTMFactory is Test {
         assertEq(TMFactory(factory).getTokenImplementation(), tokenImplementation, "test_Constructor::7");
         assertEq(TMFactory(factory).getMinUpdateTime(), defaultMinUpdateTime, "test_Constructor::8");
         assertEq(TMFactory(factory).getProtocolFeeShare(), defaultProtocolFeeShare, "test_Constructor::9");
-        assertEq(TMFactory(factory).getDefaultFee(), defaultFee, "test_Constructor::10");
-        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::11");
-        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::12");
-        assertEq(TMFactory(factory).getQuoteTokensLength(), 1, "test_Constructor::13");
-        assertEq(TMFactory(factory).getQuoteTokenAt(0), quoteToken, "test_Constructor::14");
+        (uint256 feeA, uint256 feeB) = TMFactory(factory).getDefaultFees();
+        assertEq(feeA, defaultFeeA, "test_Constructor::10");
+        assertEq(feeB, defaultFeeB, "test_Constructor::11");
+        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::12");
+        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::13");
+        assertEq(TMFactory(factory).getQuoteTokensLength(), 1, "test_Constructor::14");
+        assertEq(TMFactory(factory).getQuoteTokenAt(0), quoteToken, "test_Constructor::15");
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        TMFactory(factory).initialize(0, 0, 0, address(0), address(0), address(0), address(0));
+        TMFactory(factory).initialize(0, 0, 0, 0, address(0), address(0), address(0), address(0));
     }
 
     function test_Fuzz_SetMinUpdateTime(uint256 minUpdateTime) public {
@@ -141,37 +145,45 @@ contract TestTMFactory is Test {
         TMFactory(factory).setProtocolFeeShare(bound(protocolFeeShare, 1e6 + 1, type(uint256).max));
     }
 
-    function test_Fuzz_SetDefaultFee(uint256 fee) public {
-        fee = bound(fee, 0, 1e6);
+    function test_Fuzz_SetDefaultFee(uint256 feeA, uint256 feeB) public {
+        feeA = bound(feeA, 0, 1e6);
+        feeB = bound(feeB, 0, 1e6);
 
         vm.prank(admin);
-        TMFactory(factory).setDefaultFee(fee);
+        TMFactory(factory).setDefaultFees(feeA, feeB);
 
-        assertEq(TMFactory(factory).getDefaultFee(), fee, "test_Fuzz_SetDefaultFee::1");
-
-        vm.prank(admin);
-        TMFactory(factory).setDefaultFee(0);
-
-        assertEq(TMFactory(factory).getDefaultFee(), 0, "test_Fuzz_SetDefaultFee::2");
+        (uint256 a, uint256 b) = TMFactory(factory).getDefaultFees();
+        assertEq(a, feeA, "test_Fuzz_SetDefaultFee::1");
+        assertEq(b, feeB, "test_Fuzz_SetDefaultFee::2");
 
         vm.prank(admin);
-        TMFactory(factory).setDefaultFee(fee);
+        TMFactory(factory).setDefaultFees(0, 0);
 
-        assertEq(TMFactory(factory).getDefaultFee(), fee, "test_Fuzz_SetDefaultFee::3");
+        (a, b) = TMFactory(factory).getDefaultFees();
+        assertEq(a, 0, "test_Fuzz_SetDefaultFee::3");
+        assertEq(b, 0, "test_Fuzz_SetDefaultFee::4");
+
+        vm.prank(admin);
+        TMFactory(factory).setDefaultFees(feeA, feeB);
+
+        (a, b) = TMFactory(factory).getDefaultFees();
+        assertEq(a, feeA, "test_Fuzz_SetDefaultFee::5");
+        assertEq(b, feeB, "test_Fuzz_SetDefaultFee::6");
     }
 
-    function test_Fuzz_Revert_SetDefaultFee(address caller, uint256 fee) public {
+    function test_Fuzz_Revert_SetDefaultFee(address caller, uint256 feeA, uint256 feeB) public {
         if (caller == admin) caller = address(1);
 
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, bytes32(0))
         );
         vm.prank(caller);
-        TMFactory(factory).setDefaultFee(0);
+        TMFactory(factory).setDefaultFees(0, 0);
 
         vm.prank(admin);
         vm.expectRevert(ITMFactory.InvalidFee.selector);
-        TMFactory(factory).setDefaultFee(bound(fee, 1e6 + 1, type(uint256).max));
+        TMFactory(factory)
+            .setDefaultFees(bound(feeA, 1e6 + 1, type(uint256).max), bound(feeB, 1e6 + 1, type(uint256).max));
     }
 
     function test_Fuzz_SetMarketImplementation(address[] memory quotes, uint256 toRemove) public {
@@ -337,22 +349,24 @@ contract TestTMFactory is Test {
         assertEq(ITMMarket(market).getFactory(), factory, "test_Fuzz_CreateMarket::7");
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Fuzz_CreateMarket::8");
         assertEq(ITMMarket(market).getQuoteToken(), quoteToken, "test_Fuzz_CreateMarket::9");
-        assertEq(ITMMarket(market).getFee(), defaultFee, "test_Fuzz_CreateMarket::10");
-        assertEq(ITMMarket(market).getCurrentSqrtRatio(), 1 << 96, "test_Fuzz_CreateMarket::11");
+        (uint256 feeA, uint256 feeB) = ITMMarket(market).getFees();
+        assertEq(feeA, defaultFeeA, "test_Fuzz_CreateMarket::10");
+        assertEq(feeB, defaultFeeB, "test_Fuzz_CreateMarket::11");
+        assertEq(ITMMarket(market).getCurrentSqrtRatio(), 1 << 96, "test_Fuzz_CreateMarket::12");
 
-        assertEq(TMFactory(factory).getTokensLength(), 1, "test_Fuzz_CreateMarket::12");
-        assertEq(TMFactory(factory).getTokenAt(0), token, "test_Fuzz_CreateMarket::13");
-        assertEq(TMFactory(factory).getMarketsLength(), 1, "test_Fuzz_CreateMarket::14");
-        assertEq(TMFactory(factory).getMarketAt(0), market, "test_Fuzz_CreateMarket::15");
-        assertEq(TMFactory(factory).getMarketOf(token), market, "test_Fuzz_CreateMarket::16");
-        assertEq(TMFactory(factory).getMarketByCreatorLength(caller), 1, "test_Fuzz_CreateMarket::17");
-        assertEq(TMFactory(factory).getMarketByCreatorAt(caller, 0), market, "test_Fuzz_CreateMarket::18");
+        assertEq(TMFactory(factory).getTokensLength(), 1, "test_Fuzz_CreateMarket::13");
+        assertEq(TMFactory(factory).getTokenAt(0), token, "test_Fuzz_CreateMarket::14");
+        assertEq(TMFactory(factory).getMarketsLength(), 1, "test_Fuzz_CreateMarket::15");
+        assertEq(TMFactory(factory).getMarketAt(0), market, "test_Fuzz_CreateMarket::16");
+        assertEq(TMFactory(factory).getMarketOf(token), market, "test_Fuzz_CreateMarket::17");
+        assertEq(TMFactory(factory).getMarketByCreatorLength(caller), 1, "test_Fuzz_CreateMarket::18");
+        assertEq(TMFactory(factory).getMarketByCreatorAt(caller, 0), market, "test_Fuzz_CreateMarket::19");
 
         ITMFactory.MarketDetails memory details = TMFactory(factory).getMarketDetails(market);
-        assertEq(details.initialized, true, "test_Fuzz_CreateMarket::19");
-        assertEq(details.creator, caller, "test_Fuzz_CreateMarket::20");
-        assertEq(details.feeRecipient, feeRecipient, "test_Fuzz_CreateMarket::21");
-        assertEq(details.pendingCreator, address(0), "test_Fuzz_CreateMarket::22");
+        assertEq(details.initialized, true, "test_Fuzz_CreateMarket::20");
+        assertEq(details.creator, caller, "test_Fuzz_CreateMarket::21");
+        assertEq(details.feeRecipient, feeRecipient, "test_Fuzz_CreateMarket::22");
+        assertEq(details.pendingCreator, address(0), "test_Fuzz_CreateMarket::23");
     }
 
     function test_Fuzz_Revert_CreateMarket(address quoteToken_, address feeRecipient) public {

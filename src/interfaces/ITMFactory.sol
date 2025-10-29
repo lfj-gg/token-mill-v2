@@ -22,7 +22,7 @@ interface ITMFactory {
         address indexed market, address indexed creator, address indexed feeRecipient, address pendingCreator
     );
     event ProtocolFeeShareSet(address indexed sender, uint256 protocolFeeShare);
-    event DefaultFeeSet(address indexed sender, uint256 defaultFee);
+    event DefaultFeesSet(address indexed sender, uint256 defaultFeeA, uint256 defaultFeeB);
     event MarketImplementationSet(address indexed sender, address indexed quoteToken, address marketImplementation);
     event TokenImplementationSet(address indexed sender, address tokenImplementation);
     event FeeReceived(
@@ -44,7 +44,8 @@ interface ITMFactory {
     function initialize(
         uint256 protocolFeeShare,
         uint256 minUpdateTime,
-        uint256 defaultFee,
+        uint256 defaultFeeA,
+        uint256 defaultFeeB,
         address quoteToken,
         address marketImplementation,
         address tokenImplementation,
@@ -69,7 +70,7 @@ interface ITMFactory {
 
     function getProtocolFeeShare() external view returns (uint256);
 
-    function getDefaultFee() external view returns (uint256);
+    function getDefaultFees() external view returns (uint256, uint256);
 
     function getUnclaimedFees(address token, address account) external view returns (uint256);
 
@@ -109,7 +110,7 @@ interface ITMFactory {
 
     function setProtocolFeeShare(uint256 protocolFeeShare) external returns (bool);
 
-    function setDefaultFee(uint256 defaultFee) external returns (bool);
+    function setDefaultFees(uint256 defaultFeeA, uint256 defaultFeeB) external returns (bool);
 
     function setMarketImplementation(address quoteToken, address marketImplementation) external returns (bool);
 
