@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "src/TMToken.sol";
+import {ITMToken, TMToken} from "src/TMToken.sol";
 
 contract TestTMToken is Test {
     address implementation;

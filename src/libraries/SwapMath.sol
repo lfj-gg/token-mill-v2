@@ -1,4 +1,4 @@
-    // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import {Math} from "./Math.sol";
@@ -6,7 +6,8 @@ import {Math} from "./Math.sol";
 /**
  * @title Swap Math library
  * @dev Math library to calculate conversions from/to liquidity to/from token amounts.
- * Inspired by Uniswap V3's libraries: https://github.com/Uniswap/v3-core/tree/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/libraries
+ * Inspired by Uniswap V3's libraries:
+ * https://github.com/Uniswap/v3-core/tree/d8b1c635c275d2a9450bd6a78f3fa2484fef73eb/contracts/libraries
  */
 library SwapMath {
     error LiquidityOverflow0();
@@ -21,10 +22,10 @@ library SwapMath {
      * If the current ratio is less than the target ratio, the input is token1 and the output is token0.
      * In any case, the next ratio will always move towards the target ratio, without ever exceeding it.
      * If deltaAmount is positive, the function will try to swap as much input as possible, up to abs(deltaAmount).
-     * If deltaAmount is negative, the function will try to swap as much input as possible in order to get abs(deltaAmount)
-     * of output token.
-     * In any case, the function will never exceed the exact input (if deltaAmount is positive) or output (if deltaAmount
-     * is negative) amount.
+     * If deltaAmount is negative, the function will try to swap as much input as possible in order to get
+     * abs(deltaAmount) of output token.
+     * In any case, the function will never exceed the exact input (if deltaAmount is positive) or output (if
+     * deltaAmount is negative) amount.
      * The fee will always be paid in the input token.
      * **The requirements on the parameters need to be enforced by the caller.**
      *
@@ -50,14 +51,18 @@ library SwapMath {
 
         unchecked {
             if (deltaAmount > 0) {
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256 remainingAmountIn = uint256(deltaAmount) * (MAX_FEE - fee) / (MAX_FEE);
                 amountIn = getAmountIn(sqrtRatioX96, sqrtTargetRatioX96, liquidity, true);
 
                 if (amountIn > remainingAmountIn) {
                     sqrtNextX96 = sqrtRatioX96 > sqrtTargetRatioX96
+                        // forge-lint: disable-next-line(unsafe-typecast)
                         ? getNextSqrtRatioFromAmount0(sqrtRatioX96, liquidity, int256(remainingAmountIn))
+                        // forge-lint: disable-next-line(unsafe-typecast)
                         : getNextSqrtRatioFromAmount1(sqrtRatioX96, liquidity, int256(remainingAmountIn));
                     amountIn = getAmountIn(sqrtRatioX96, sqrtNextX96, liquidity, true);
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     feeAmountIn = uint256(deltaAmount) - amountIn;
                 } else {
                     sqrtNextX96 = sqrtTargetRatioX96;
@@ -68,6 +73,7 @@ library SwapMath {
             } else {
                 if (deltaAmount == 0) return (sqrtRatioX96, 0, 0, 0);
 
+                // forge-lint: disable-next-line(unsafe-typecast)
                 uint256 remainingAmountOut = uint256(-deltaAmount);
                 amountOut = getAmountOut(sqrtRatioX96, sqrtTargetRatioX96, liquidity, false);
 
@@ -110,7 +116,8 @@ library SwapMath {
     /**
      * @dev Get the amount of token0 given two ratios and an amount of liquidity.
      * Rounds up if `adding` is true, rounds down otherwise.
-     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and amount0.
+     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and
+     * amount0.
      * **The requirements on the parameters need to be enforced by the caller.**
      *
      * Requirements:
@@ -138,7 +145,8 @@ library SwapMath {
     /**
      * @dev Get the amount of token1 given two ratios and an amount of liquidity.
      * Rounds up if `adding` is true, rounds down otherwise.
-     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and amount1.
+     * We can use the lossless version because of the restriction on sqrtRatioAX96, sqrtRatioBX96, liquidity and
+     * amount1.
      * **The requirements on the parameters need to be enforced by the caller.**
      *
      * Requirements:
@@ -184,9 +192,12 @@ library SwapMath {
     {
         liquidity <<= 96; // `liquidity << 96` can't overflow as it's a uint127
         unchecked {
-            int256 denominator = int256(liquidity) + amount0 * int256(sqrtRatioX96); // `amount0 * sqrtRatioX96` can't overflow as it's a int128 * uint128
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256 denominator = int256(liquidity) + amount0 * int256(sqrtRatioX96); // `amount0 * sqrtRatioX96` can't
+            // overflow as it's a int128 * uint128
             if (denominator <= 0) revert LiquidityOverflow0();
 
+            // forge-lint: disable-next-line(unsafe-typecast)
             return Math.fullMulDivUp(liquidity, sqrtRatioX96, uint256(denominator));
         }
     }
@@ -214,8 +225,12 @@ library SwapMath {
     {
         unchecked {
             // `sqrtRatioX96 * liquidity` can't overflow as it's a uint127 * uint127, it fits in int256
-            int256 numerator = int256(sqrtRatioX96 * liquidity) + (amount1 << 96); // `amount1 << 96` can't overflow as it's a int128
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int256 numerator = int256(sqrtRatioX96 * liquidity) + (amount1 << 96); // `amount1 << 96` can't overflow as
+            // it's a int128
             if (numerator <= 0) revert LiquidityOverflow1();
+
+            // forge-lint: disable-next-line(unsafe-typecast)
             return uint256(numerator) / liquidity;
         }
     }

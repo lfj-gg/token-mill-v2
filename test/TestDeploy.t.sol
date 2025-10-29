@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {StdChains, Test} from "forge-std/Test.sol";
 
-import "script/Deploy.s.sol";
+import {Deploy} from "script/Deploy.s.sol";
+import {ITMFactory} from "src/interfaces/ITMFactory.sol";
+import {ITMMarket} from "src/interfaces/ITMMarket.sol";
+import {ITMToken} from "src/interfaces/ITMToken.sol";
 
 contract TestDeploy is Deploy, Test {
     address constant WAVAX = 0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7;

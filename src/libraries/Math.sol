@@ -24,6 +24,7 @@ library Math {
      */
     function safeInt128(int256 x) internal pure returns (int256) {
         unchecked {
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (uint256(x) + 2 ** 127 >= 2 ** 128) revert Int128Overflow();
             return x;
         }
@@ -52,6 +53,7 @@ library Math {
      * - `x` must fit into a int256
      */
     function toInt256(uint256 x) internal pure returns (int256) {
+        // forge-lint: disable-next-line(unsafe-typecast)
         if (int256(x) >= 0) return int256(x);
         revert Int256Overflow();
     }
@@ -67,6 +69,7 @@ library Math {
      */
     function addDelta128(uint256 x, int256 delta) internal pure returns (uint256 z) {
         unchecked {
+            // forge-lint: disable-next-line(unsafe-typecast)
             z = x + uint256(delta);
             if ((z | x) >= 2 ** 128) revert AddDeltaOverflow();
         }
@@ -75,7 +78,8 @@ library Math {
     /**
      * @dev Performs `x / d` and returns the result, rounding up.
      * If `d` is zero, reverts with `DivFailed()`.
-     * Credit to Solady: https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L643-L654
+     * Credit to Solady:
+     * https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L643-L654
      *
      * Requirements:
      *
@@ -94,7 +98,8 @@ library Math {
     /**
      * @dev Performs full `x * y / d` with full precision and returns the result.
      * If the result overflows, reverts with `FullMulDivFailed()`.
-     * Credit to Solady: https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L452-L512
+     * Credit to Solady:
+     * https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L452-L512
      *
      * Requirements:
      *
@@ -121,11 +126,10 @@ library Math {
                     inv := mul(inv, sub(2, mul(d, inv)))
                     inv := mul(inv, sub(2, mul(d, inv)))
                     inv := mul(inv, sub(2, mul(d, inv)))
-                    z :=
-                        mul(
-                            or(mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)), div(sub(z, r), t)),
-                            mul(sub(2, mul(d, inv)), inv)
-                        )
+                    z := mul(
+                        or(mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)), div(sub(z, r), t)),
+                        mul(sub(2, mul(d, inv)), inv)
+                    )
                     break
                 }
                 z := div(z, d)
@@ -137,7 +141,8 @@ library Math {
     /**
      * @dev Performs full `x * y / d` with full precision and returns the result, rounding up.
      * If the result overflows, reverts with `FullMulDivFailed()`.
-     * Credit to Solady: https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L544-L560
+     * Credit to Solady:
+     * https://github.com/Vectorized/solady/blob/6015421588b6e20c98fd60fb1f07f39eb8a1d049/src/utils/FixedPointMathLib.sol#L544-L560
      *
      * Requirements:
      *

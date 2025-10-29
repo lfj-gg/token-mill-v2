@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Script.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Script} from "forge-std/Script.sol";
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import "src/TMFactory.sol";
-import "src/TMToken.sol";
-import "src/TMMarket.sol";
-import "script/Parameters.sol";
+import {Parameters} from "script/Parameters.sol";
+import {ITMFactory, TMFactory} from "src/TMFactory.sol";
+import {TMMarket} from "src/TMMarket.sol";
+import {TMToken} from "src/TMToken.sol";
 
 contract Deploy is Script, Parameters {
     function run()

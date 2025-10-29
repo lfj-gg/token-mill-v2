@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
-import "src/libraries/SwapMath.sol";
+import {Math, SwapMath} from "src/libraries/SwapMath.sol";
 
 contract SwapMathTest is Test {
     function test_fuzz_GetLiquidityAndAmount0(uint256 sqrtPriceAX96, uint256 sqrtPriceBX96, uint256 amount0)
@@ -238,7 +238,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (sqrtRatioX96 - targetRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (sqrtRatioX96 - targetRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (sqrtRatioX96 - targetRatioX96)
             );
@@ -292,7 +294,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (sqrtRatioX96 - targetRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (sqrtRatioX96 - targetRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (sqrtRatioX96 - targetRatioX96)
             );
@@ -343,7 +347,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (sqrtRatioX96 - targetRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (sqrtRatioX96 - targetRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (sqrtRatioX96 - targetRatioX96)
             );
@@ -399,7 +405,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (sqrtRatioX96 - targetRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (sqrtRatioX96 - targetRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (sqrtRatioX96 - targetRatioX96)
             );
@@ -453,7 +461,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (targetRatioX96 - sqrtRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (targetRatioX96 - sqrtRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (targetRatioX96 - sqrtRatioX96)
             );
@@ -507,7 +517,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (targetRatioX96 - sqrtRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (targetRatioX96 - sqrtRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (targetRatioX96 - sqrtRatioX96)
             );
@@ -562,7 +574,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (targetRatioX96 - sqrtRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (targetRatioX96 - sqrtRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (targetRatioX96 - sqrtRatioX96)
             );
@@ -618,7 +632,9 @@ contract SwapMathTest is Test {
                 prodB / denom > type(uint128).max
                     ? type(uint128).max
                     : Math.fullMulDiv(
-                        uint128(type(int128).max), sqrtRatioX96 * targetRatioX96, (targetRatioX96 - sqrtRatioX96) * 2 ** 96
+                        uint128(type(int128).max),
+                        sqrtRatioX96 * targetRatioX96,
+                        (targetRatioX96 - sqrtRatioX96) * 2 ** 96
                     ),
                 uint256(uint128(type(int128).max)) * 2 ** 96 / (targetRatioX96 - sqrtRatioX96)
             );
