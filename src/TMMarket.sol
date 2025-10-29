@@ -281,6 +281,7 @@ contract TMMarket is ITMMarket {
                 // Swap fee0 to fee1
                 // forge-lint: disable-next-item(unsafe-typecast)
                 (nextSqrtRatioX96,, feeAmount1,) =
+                    // forge-lint: disable-next-line(unsafe-typecast)
                     _getDeltaAmounts(zeroForOne, int256(feeAmountIn), sqrtRatioAX96, nextSqrtRatioX96, 0);
             } else {
                 // forge-lint: disable-next-line(unsafe-typecast)
