@@ -9,6 +9,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ITMFactory} from "./interfaces/ITMFactory.sol";
 import {ITMMarket} from "./interfaces/ITMMarket.sol";
 import {ITMToken} from "./interfaces/ITMToken.sol";
+import {IWNative} from "./interfaces/IWNative.sol";
 import {Math} from "./libraries/Math.sol";
 import {SwapMath} from "./libraries/SwapMath.sol";
 
@@ -36,6 +37,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     bytes32 public constant override PROTOCOL_FEE_COLLECTOR_ROLE = keccak256("PROTOCOL_FEE_COLLECTOR_ROLE");
 
     bytes32 public constant override MARKET_MIGRATOR_ROLE = keccak256("MARKET_MIGRATOR_ROLE");
+
+    address public immutable override WNATIVE;
 
     mapping(address quoteToken => address marketImplementation) private _marketImplementations;
     address private _tokenImplementation;
@@ -66,8 +69,11 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         address quoteToken,
         address marketImplementation,
         address tokenImplementation,
-        address admin
+        address admin,
+        address wnative
     ) {
+        WNATIVE = wnative;
+
         initialize(
             minUpdateTime,
             protocolFeeShare,
@@ -228,6 +234,7 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
     /**
      * @dev Creates a new market with {name}, {symbol}, {quoteToken} and {feeRecipient}.
      * The market will be created with the default fee and the creator will be set to the caller of this function.
+     * The function also performs an initial swap by sending {amountQuoteIn} of {quoteToken} to the market
      * Emits a {MarketCreated} event with the creator, quote token, market, token, name and symbol.
      * Emits a {MarketDetailsUpdated} event with the market, creator and fee recipient.
      *
@@ -235,11 +242,14 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
      *
      * - The {quoteToken} must be supported by the factory.
      */
-    function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
-        external
-        override
-        returns (address token, address market)
-    {
+    function createMarket(
+        string calldata name,
+        string calldata symbol,
+        address quoteToken,
+        address feeRecipient,
+        uint256 amountQuoteIn,
+        uint256 minAmountBaseOut
+    ) external payable override returns (address token, address market, uint256 amountBaseOut) {
         if (feeRecipient != KOTM_FEE_RECIPIENT()) revert InvalidFeeRecipient();
 
         (token, market) = _createMarket(name, symbol, quoteToken);
@@ -258,6 +268,34 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
 
         emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
         emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
+
+        if (amountQuoteIn > 0) {
+            if (msg.value >= amountQuoteIn && quoteToken == WNATIVE) {
+                IWNative(quoteToken).deposit{value: amountQuoteIn}();
+                IERC20(quoteToken).safeTransfer(market, amountQuoteIn);
+            } else {
+                IERC20(quoteToken).safeTransferFrom(msg.sender, market, amountQuoteIn);
+            }
+
+            // forge-lint: disable-next-item(unsafe-typecast)
+            (int256 deltaBaseAmount, int256 deltaQuoteAmount) =
+                ITMMarket(market).swap(msg.sender, false, int256(amountQuoteIn), 2 ** 127 - 1);
+
+            // forge-lint: disable-next-line(unsafe-typecast)
+            if (uint256(deltaQuoteAmount) != amountQuoteIn) revert TooManyQuoteTokenSent();
+
+            // forge-lint: disable-next-line(unsafe-typecast)
+            amountBaseOut = uint256(-deltaBaseAmount);
+
+            if (amountBaseOut < minAmountBaseOut) revert InsufficientOutputAmount();
+        }
+
+        if (msg.value > 0) {
+            uint256 leftOver = address(this).balance;
+            if (leftOver > 0) {
+                _transferNative(msg.sender, leftOver);
+            }
+        }
     }
 
     /**
@@ -606,5 +644,15 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         _tokenImplementation = tokenImplementation;
 
         emit TokenImplementationSet(msg.sender, tokenImplementation);
+    }
+
+    /**
+     * @dev Transfers `amount` of native tokens to `to`.
+     * @param to The account to transfer the native tokens to.
+     * @param amount The amount of native tokens to transfer.
+     */
+    function _transferNative(address to, uint256 amount) internal {
+        (bool success,) = to.call{value: amount}(new bytes(0));
+        if (!success) revert TransferFailed();
     }
 }

@@ -13,6 +13,9 @@ interface ITMFactory {
     error InvalidMinUpdateTime();
     error MismatchedQuoteToken();
     error InvalidFeeRecipient();
+    error TooManyQuoteTokenSent();
+    error InsufficientOutputAmount();
+    error TransferFailed();
 
     event MarketCreated(
         address indexed creator, address indexed quoteToken, address market, address token, string name, string symbol
@@ -62,6 +65,8 @@ interface ITMFactory {
 
     function MARKET_MIGRATOR_ROLE() external view returns (bytes32);
 
+    function WNATIVE() external view returns (address);
+
     function getMarketImplementation(address quoteToken) external view returns (address);
 
     function getTokenImplementation() external view returns (address);
@@ -94,9 +99,14 @@ interface ITMFactory {
 
     function getMarketByCreatorAt(address creator, uint256 index) external view returns (address);
 
-    function createMarket(string calldata name, string calldata symbol, address quoteToken, address feeRecipient)
-        external
-        returns (address token, address market);
+    function createMarket(
+        string calldata name,
+        string calldata symbol,
+        address quoteToken,
+        address feeRecipient,
+        uint256 amountQuoteIn,
+        uint256 minAmountBaseOut
+    ) external payable returns (address token, address market, uint256 amountBaseOut);
 
     function migrateMarket(address market, address recipient) external returns (uint256 amount0, uint256 amount1);
 

@@ -5,34 +5,33 @@ import {IAccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Test} from "forge-std/Test.sol";
 
+import {Parameters} from "script/Parameters.sol";
 import {ITMFactory, TMFactory} from "src/TMFactory.sol";
 import {ITMMarket, TMMarket} from "src/TMMarket.sol";
 import {ITMToken, TMToken} from "src/TMToken.sol";
 import {Math} from "src/libraries/Math.sol";
 import {ERC20, MockERC20} from "test/mocks/MockERC20.sol";
+import {WNative} from "test/mocks/WNative.sol";
 
-contract TestTMFactory is Test {
+contract TestTMFactory is Test, Parameters {
     address tokenImplementation;
     address marketImplementation;
     address factory;
     address KOTM_FEE_RECIPIENT;
 
-    uint256 defaultProtocolFeeShare = 0.2e6; // 20%
-    uint256 defaultMinUpdateTime = 100;
-    uint256 defaultFeeA = 0.01e6; // 1%
-    uint256 defaultFeeB = 0.02e6; // 2%
-
     address admin = makeAddr("admin");
-    address quoteToken = makeAddr("quoteToken");
 
-    uint256 constant supply = 1e18;
+    bool revertOnFallback;
 
     function setUp() public {
+        quoteToken = address(new MockERC20());
+        wnative = address(new WNative());
+
         address factoryAddress = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 2);
 
         tokenImplementation = address(new TMToken(factoryAddress));
         marketImplementation =
-            address(new TMMarket(factoryAddress, quoteToken, supply / 2, supply / 2, 1 << 96, 2 << 96));
+            address(new TMMarket(factoryAddress, quoteToken, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
 
         factory = address(
             new TMFactory(
@@ -43,7 +42,8 @@ contract TestTMFactory is Test {
                 quoteToken,
                 marketImplementation,
                 tokenImplementation,
-                admin
+                admin,
+                wnative
             )
         );
 
@@ -61,19 +61,19 @@ contract TestTMFactory is Test {
         );
         assertEq(TMFactory(factory).KOTM_FEE_RECIPIENT(), factory, "test_Constructor::3");
         assertEq(TMFactory(factory).KOTM_COLLECTOR_ROLE(), keccak256("KOTM_COLLECTOR_ROLE"), "test_Constructor::4");
-
-        assertEq(TMFactory(factory).hasRole(bytes32(0), admin), true, "test_Constructor::5");
-        assertEq(TMFactory(factory).getMarketImplementation(quoteToken), marketImplementation, "test_Constructor::6");
-        assertEq(TMFactory(factory).getTokenImplementation(), tokenImplementation, "test_Constructor::7");
-        assertEq(TMFactory(factory).getMinUpdateTime(), defaultMinUpdateTime, "test_Constructor::8");
-        assertEq(TMFactory(factory).getProtocolFeeShare(), defaultProtocolFeeShare, "test_Constructor::9");
+        assertEq(TMFactory(factory).WNATIVE(), wnative, "test_Constructor::5");
+        assertEq(TMFactory(factory).hasRole(bytes32(0), admin), true, "test_Constructor::6");
+        assertEq(TMFactory(factory).getMarketImplementation(quoteToken), marketImplementation, "test_Constructor::7");
+        assertEq(TMFactory(factory).getTokenImplementation(), tokenImplementation, "test_Constructor::8");
+        assertEq(TMFactory(factory).getMinUpdateTime(), defaultMinUpdateTime, "test_Constructor::9");
+        assertEq(TMFactory(factory).getProtocolFeeShare(), defaultProtocolFeeShare, "test_Constructor::10");
         (uint256 feeA, uint256 feeB) = TMFactory(factory).getDefaultFees();
-        assertEq(feeA, defaultFeeA, "test_Constructor::10");
-        assertEq(feeB, defaultFeeB, "test_Constructor::11");
-        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::12");
-        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::13");
-        assertEq(TMFactory(factory).getQuoteTokensLength(), 1, "test_Constructor::14");
-        assertEq(TMFactory(factory).getQuoteTokenAt(0), quoteToken, "test_Constructor::15");
+        assertEq(feeA, defaultFeeA, "test_Constructor::11");
+        assertEq(feeB, defaultFeeB, "test_Constructor::12");
+        assertEq(TMFactory(factory).getTokensLength(), 0, "test_Constructor::13");
+        assertEq(TMFactory(factory).getMarketsLength(), 0, "test_Constructor::14");
+        assertEq(TMFactory(factory).getQuoteTokensLength(), 1, "test_Constructor::15");
+        assertEq(TMFactory(factory).getQuoteTokenAt(0), quoteToken, "test_Constructor::16");
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         TMFactory(factory).initialize(0, 0, 0, 0, address(0), address(0), address(0), address(0));
@@ -336,15 +336,15 @@ contract TestTMFactory is Test {
         feeRecipient = KOTM_FEE_RECIPIENT;
 
         vm.prank(caller);
-        (address token, address market) =
-            TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, feeRecipient);
+        (address token, address market, uint256 baseAmountOut) =
+            TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, feeRecipient, 0, 0);
 
         assertEq(ERC20(token).name(), "Test Name", "test_Fuzz_CreateMarket::1");
         assertEq(ERC20(token).symbol(), "Test Symbol", "test_Fuzz_CreateMarket::2");
         assertEq(ERC20(token).decimals(), 18, "test_Fuzz_CreateMarket::3");
         assertEq(ITMToken(token).getFactory(), factory, "test_Fuzz_CreateMarket::4");
-        assertEq(ITMToken(token).totalSupply(), supply, "test_Fuzz_CreateMarket::5");
-        assertEq(ITMToken(token).balanceOf(market), supply, "test_Fuzz_CreateMarket::6");
+        assertEq(ITMToken(token).totalSupply(), amount0A + amount0B, "test_Fuzz_CreateMarket::5");
+        assertEq(ITMToken(token).balanceOf(market), amount0A + amount0B, "test_Fuzz_CreateMarket::6");
 
         assertEq(ITMMarket(market).getFactory(), factory, "test_Fuzz_CreateMarket::7");
         assertEq(ITMMarket(market).getBaseToken(), token, "test_Fuzz_CreateMarket::8");
@@ -352,7 +352,7 @@ contract TestTMFactory is Test {
         (uint256 feeA, uint256 feeB) = ITMMarket(market).getFees();
         assertEq(feeA, defaultFeeA, "test_Fuzz_CreateMarket::10");
         assertEq(feeB, defaultFeeB, "test_Fuzz_CreateMarket::11");
-        assertEq(ITMMarket(market).getCurrentSqrtRatio(), 1 << 96, "test_Fuzz_CreateMarket::12");
+        assertEq(ITMMarket(market).getCurrentSqrtRatio(), sqrtPrice0, "test_Fuzz_CreateMarket::12");
 
         assertEq(TMFactory(factory).getTokensLength(), 1, "test_Fuzz_CreateMarket::13");
         assertEq(TMFactory(factory).getTokenAt(0), token, "test_Fuzz_CreateMarket::14");
@@ -367,6 +367,86 @@ contract TestTMFactory is Test {
         assertEq(details.creator, caller, "test_Fuzz_CreateMarket::21");
         assertEq(details.feeRecipient, feeRecipient, "test_Fuzz_CreateMarket::22");
         assertEq(details.pendingCreator, address(0), "test_Fuzz_CreateMarket::23");
+
+        assertEq(baseAmountOut, 0, "test_Fuzz_CreateMarket::24");
+    }
+
+    function test_Fuzz_InitialSwap(uint256 quoteAmountIn) public {
+        vm.startPrank(admin);
+        ITMFactory(factory)
+            .setMarketImplementation(
+                wnative, address(new TMMarket(factory, wnative, amount0A, amount0B, sqrtPrice0, sqrtPrice1))
+            );
+        vm.stopPrank();
+
+        (, address market,) =
+            TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
+
+        (, int256 maxQuoteIn) = TMMarket(market).getDeltaAmounts(false, -int256(amount0A + amount0B), 2 ** 127 - 1);
+        quoteAmountIn = bound(quoteAmountIn, 1, uint256(maxQuoteIn));
+        vm.deal(address(this), 3 * quoteAmountIn);
+
+        (int256 amount0,) = TMMarket(market).getDeltaAmounts(false, int256(quoteAmountIn), 2 ** 127 - 1);
+        uint256 baseAmountOutExpected = uint256(-amount0);
+
+        (,, uint256 baseAmountOut) = TMFactory(factory).createMarket{value: quoteAmountIn}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
+
+        assertEq(baseAmountOut, baseAmountOutExpected, "test_Fuzz_InitialSwap::1");
+
+        MockERC20(quoteToken).mint(address(this), quoteAmountIn);
+        MockERC20(quoteToken).approve(factory, quoteAmountIn);
+        (,, baseAmountOut) = TMFactory(factory)
+            .createMarket("Test Name", "Test Symbol", quoteToken, KOTM_FEE_RECIPIENT, quoteAmountIn, 0);
+
+        assertEq(baseAmountOut, baseAmountOutExpected, "test_Fuzz_InitialSwap::2");
+
+        WNative(wnative).deposit{value: quoteAmountIn}();
+        WNative(wnative).approve(factory, quoteAmountIn);
+
+        uint256 balanceBefore = address(this).balance;
+        (,, baseAmountOut) = TMFactory(factory).createMarket{value: quoteAmountIn - 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
+
+        assertEq(baseAmountOut, baseAmountOutExpected, "test_Fuzz_InitialSwap::3");
+        assertEq(address(this).balance, balanceBefore, "test_Fuzz_InitialSwap::4");
+    }
+
+    function test_Fuzz_Revert_InitialSwap(uint256 quoteAmountIn) public {
+        vm.startPrank(admin);
+        ITMFactory(factory)
+            .setMarketImplementation(
+                wnative, address(new TMMarket(factory, wnative, amount0A, amount0B, sqrtPrice0, sqrtPrice1))
+            );
+        vm.stopPrank();
+
+        (, address market,) =
+            TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
+
+        (, int256 maxQuoteIn) = TMMarket(market).getDeltaAmounts(false, -int256(amount0A + amount0B), 2 ** 127 - 1);
+        quoteAmountIn = bound(quoteAmountIn, 1, uint256(maxQuoteIn));
+        vm.deal(address(this), 2 ** 127 - 1);
+
+        (int256 amount0,) = TMMarket(market).getDeltaAmounts(false, int256(quoteAmountIn), 2 ** 127 - 1);
+        uint256 baseAmountOutExpected = uint256(-amount0);
+
+        vm.expectRevert(ITMFactory.InsufficientOutputAmount.selector);
+        TMFactory(factory).createMarket{value: quoteAmountIn}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, baseAmountOutExpected + 1
+        );
+
+        vm.expectRevert(ITMFactory.TooManyQuoteTokenSent.selector);
+        TMFactory(factory).createMarket{value: 2 ** 127 - 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, 2 ** 127 - 1, 0
+        );
+
+        revertOnFallback = true;
+        vm.expectRevert(ITMFactory.TransferFailed.selector);
+        TMFactory(factory).createMarket{value: quoteAmountIn + 1}(
+            "Test Name", "Test Symbol", wnative, KOTM_FEE_RECIPIENT, quoteAmountIn, 0
+        );
     }
 
     function test_Fuzz_Revert_CreateMarket(address quoteToken_, address feeRecipient) public {
@@ -376,29 +456,29 @@ contract TestTMFactory is Test {
         TMFactory(factory).setMarketImplementation(quoteToken, address(0)); // Reset market implementation
 
         vm.expectRevert(ITMFactory.InvalidFeeRecipient.selector);
-        TMFactory(factory).createMarket("", "", quoteToken, feeRecipient);
+        TMFactory(factory).createMarket("", "", quoteToken, feeRecipient, 0, 0);
 
         if (quoteToken_ == address(0)) quoteToken_ = address(1);
         address implementation = address(new MockMarketImplementation(quoteToken_));
 
         vm.expectRevert(ITMFactory.QuoteTokenNotSupported.selector);
-        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT);
+        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT, 0, 0);
 
         vm.startPrank(admin);
         TMFactory(factory).setMarketImplementation(quoteToken_, implementation);
 
         vm.expectRevert(ITMFactory.QuoteTokenNotSupported.selector);
-        TMFactory(factory).createMarket("", "", address(0), KOTM_FEE_RECIPIENT);
+        TMFactory(factory).createMarket("", "", address(0), KOTM_FEE_RECIPIENT, 0, 0);
 
         TMFactory(factory).setTokenImplementation(address(0));
 
         vm.expectRevert(ITMFactory.TokenImplementationNotSet.selector);
-        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT);
+        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT, 0, 0);
 
         TMFactory(factory).setMarketImplementation(quoteToken_, address(0));
 
         vm.expectRevert(ITMFactory.QuoteTokenNotSupported.selector);
-        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT);
+        TMFactory(factory).createMarket("", "", quoteToken_, KOTM_FEE_RECIPIENT, 0, 0);
 
         vm.stopPrank();
     }
@@ -407,11 +487,12 @@ contract TestTMFactory is Test {
         amount = bound(amount, 1, type(uint256).max / 1e6);
 
         quoteToken = address(new MockERC20());
-        marketImplementation = address(new TMMarket(factory, quoteToken, supply / 2, supply / 2, 1 << 96, 2 << 96));
+        marketImplementation = address(new TMMarket(factory, quoteToken, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
         vm.prank(admin);
         TMFactory(factory).setMarketImplementation(quoteToken, marketImplementation);
 
-        (, address market) = TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, KOTM_FEE_RECIPIENT);
+        (, address market,) =
+            TMFactory(factory).createMarket("Test Name", "Test Symbol", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
 
         MockERC20(quoteToken).mint(factory, amount);
         vm.prank(market);
@@ -492,7 +573,7 @@ contract TestTMFactory is Test {
     }
 
     function test_Fuzz_Revert_OnFeeReceived(address invalidMarket) public {
-        (, address market) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT);
+        (, address market,) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
 
         if (invalidMarket == market) invalidMarket = address(1);
 
@@ -520,7 +601,7 @@ contract TestTMFactory is Test {
 
         vm.startPrank(admin);
         TMFactory(factory).setProtocolFeeShare(0);
-        (, address market) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT);
+        (, address market,) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
         vm.stopPrank();
 
         vm.prank(caller);
@@ -575,7 +656,7 @@ contract TestTMFactory is Test {
         vm.prank(admin);
         TMFactory(factory).setMinUpdateTime(100);
 
-        (, address market) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT);
+        (, address market,) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
 
         ITMFactory.MarketDetails memory details = TMFactory(factory).getMarketDetails(market);
 
@@ -653,7 +734,7 @@ contract TestTMFactory is Test {
         vm.expectRevert(ITMFactory.InvalidMarket.selector);
         TMFactory(factory).updateMarketDetails(market, address(0), address(0));
 
-        (, market) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT);
+        (, market,) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
 
         vm.expectRevert(ITMFactory.Unauthorized.selector);
         vm.prank(caller);
@@ -666,7 +747,7 @@ contract TestTMFactory is Test {
         vm.expectRevert(ITMFactory.InvalidMarket.selector);
         TMFactory(factory).acceptMarketCreator(market);
 
-        (, market) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT);
+        (, market,) = TMFactory(factory).createMarket("", "", quoteToken, KOTM_FEE_RECIPIENT, 0, 0);
 
         vm.expectRevert(ITMFactory.Unauthorized.selector);
         vm.prank(caller);
@@ -677,6 +758,12 @@ contract TestTMFactory is Test {
         vm.expectRevert(ITMFactory.Unauthorized.selector);
         vm.prank(caller);
         TMFactory(factory).acceptMarketCreator(market);
+    }
+
+    receive() external payable {
+        if (revertOnFallback) {
+            revert("");
+        }
     }
 }
 

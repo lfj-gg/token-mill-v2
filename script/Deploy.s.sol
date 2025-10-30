@@ -28,7 +28,8 @@ contract Deploy is Script, Parameters {
         tokenImplementation = address(new TMToken(factoryProxyAddress));
         marketImplementation =
             address(new TMMarket(factoryProxyAddress, quoteToken, amount0A, amount0B, sqrtPrice0, sqrtPrice1));
-        factoryImplementation = address(new TMFactory(0, 0, 0, 0, address(0), address(0), address(0), address(0)));
+        factoryImplementation =
+            address(new TMFactory(0, 0, 0, 0, address(0), address(0), address(0), address(0), wnative));
 
         factoryProxy = address(
             new TransparentUpgradeableProxy(
