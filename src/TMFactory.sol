@@ -266,6 +266,9 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         });
         _marketsByCreator[msg.sender].add(market);
 
+        emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
+        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
+
         if (amountQuoteIn > 0) {
             if (msg.value >= amountQuoteIn && quoteToken == WNATIVE) {
                 IWNative(quoteToken).deposit{value: amountQuoteIn}();
@@ -293,9 +296,6 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
                 _transferNative(msg.sender, leftOver);
             }
         }
-
-        emit MarketCreated(msg.sender, quoteToken, market, token, name, symbol);
-        emit MarketDetailsUpdated(market, msg.sender, feeRecipient, address(0));
     }
 
     /**
