@@ -72,6 +72,8 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
         address admin,
         address wnative
     ) {
+        WNATIVE = wnative;
+
         initialize(
             minUpdateTime,
             protocolFeeShare,
@@ -82,13 +84,11 @@ contract TMFactory is AccessControlUpgradeable, ITMFactory {
             tokenImplementation,
             admin
         );
-
-        WNATIVE = wnative;
     }
 
     /**
      * @dev Initializes the contract with {minUpdateTime}, {protocolFeeShare}, {defaultFeeA}, {defaultFeeB}, {marketImplementation},
-     * {tokenImplementation}, {admin} and {wnative}.
+     * {tokenImplementation} and {admin}.
      */
     function initialize(
         uint256 minUpdateTime,
