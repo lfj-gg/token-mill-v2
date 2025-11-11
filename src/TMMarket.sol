@@ -209,7 +209,7 @@ contract TMMarket is ITMMarket {
      * deltaAmount
      * is negative) amount.
      * The positive amount returned must be sent to the contract prior to calling the swap function.
-     * The negative amount returned will be sent to the caller after the swap.
+     * The negative amount returned will be sent to the recipient after the swap.
      *
      * Requirements:
      *
