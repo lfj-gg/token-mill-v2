@@ -377,8 +377,8 @@ contract TMMarket is ITMMarket {
             (uint256 liquidity, uint256 fee) =
                 currentSqrtRatioX96 >= sqrtRatioBX96 ? (liquidityB, feeB) : (liquidityA, feeA);
             uint256 targetRatioX96 = (zeroForOne
-                        ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
-                        : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+                    ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                    : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
                 ? sqrtRatioBX96
                 : sqrtRatioLimitX96;
 
