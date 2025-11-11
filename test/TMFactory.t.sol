@@ -582,13 +582,9 @@ contract TestTMFactory is Test, Parameters {
         TMFactory(factory).onFeeReceived(quoteToken, 0);
     }
 
-    function test_Fuzz_Revert_Collect(
-        address token,
-        address caller,
-        address account,
-        address recipient,
-        uint256 amount
-    ) public {
+    function test_Fuzz_Revert_Collect(address token, address caller, address account, address recipient, uint256 amount)
+        public
+    {
         amount = bound(amount, 1, type(uint256).max - 1);
 
         address protocolFeeRecipient = ITMFactory(factory).PROTOCOL_FEE_RECIPIENT();

@@ -1,66 +1,72 @@
-## Foundry
+# Token Mill V2
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+EVM token launcher from LFJ
 
-Foundry consists of:
+## Bonding Curve
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+Token Mill V2 bonding curve is the combination of 2 Uni-V3 style pricing curves, called pool A and B in the code. Pool A will be in effect until 80% of the total supply is minted, and pool B for the rest, mimicking a graduation event. Those pools use two different virtual liquidity amounts, that will change the pricing dynamic when switching from one to the other.
 
-## Documentation
+![Price Curve](https://github.com/user-attachments/assets/f127c0b8-acf4-43c7-aed3-c9732db90fe2)
 
-https://book.getfoundry.sh/
+Fees can be different on the two sides of the curve.
 
-## Usage
+## King of the Mill
 
-### Build
+Token Mill V2 redirects swap fees to a fee pool, that will be used for an aidrop program called King of the Mill (KotM). Every period, fees accumulated will be airdropped to a randomly selected set of holders of the winning token (selected based on market cap and volume).
 
-```shell
-$ forge build
+
+## Contracts
+
+### Factory
+
+Creates token and manages protocol and KotM fees.
+
+Token creation allows for an initial buy based on `amountQuoteIn`:
+```solidity
+function createMarket(
+        string calldata name,
+        string calldata symbol,
+        address quoteToken,
+        address feeRecipient,
+        uint256 amountQuoteIn,
+        uint256 minAmountBaseOut
+    ) external payable returns (address token, address market, uint256 amountBaseOut)
 ```
 
-### Test
-
-```shell
-$ forge test
+To get the market address from a token:
+```solidity
+function getMarketOf(address token) external view returns (address)
 ```
 
-### Format
+### Market
 
-```shell
-$ forge fmt
+Get quotes using `getDeltaAmounts`:
+```solidity
+function getDeltaAmounts(bool zeroForOne, int256 deltaAmount, uint256 sqrtRatioLimitX96)
+        external
+        view
+        returns (int256 amount0, int256 amount1)
 ```
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
+Buy and sell tokens using `swap`:
+```solidity
+function swap(address to, bool zeroForOne, int256 deltaAmount, uint256 sqrtRatioLimitX96)
+        external
+        returns (int256 amount0, int256 amount1)
 ```
 
-### Anvil
+Swaps rely on the `zeroForOne` and `deltaAmount` parameters.
+- If zeroForOne is true, the input is token0 and the output is token1 ("**sell**")
+- If zeroForOne is false, the input is token1 and the output is token0 ("**buy**")
+- If deltaAmount is positive, it's an amount **in**
+- If deltaAmount is negative, it's an amount **out**
+- The positive amount returned must be sent to the contract prior to calling the swap function
+- The negative amount returned will be sent to the recipient after the swap
 
-```shell
-$ anvil
-```
+If not used, `sqrtRatioLimitX96` can be set to `2^127 - 1` (max price) when buying and `market.getSqrtRatiosBounds().0` (min price, also called sqrtRatioAX96) when selling.
 
-### Deploy
+The swap function is meant to be used by a router that will properly handle token transfers and check slippage.
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+### Token
 
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+Regular ERC20 token with its supply minted on market creation.

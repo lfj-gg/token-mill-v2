@@ -209,7 +209,7 @@ contract TMMarket is ITMMarket {
      * deltaAmount
      * is negative) amount.
      * The positive amount returned must be sent to the contract prior to calling the swap function.
-     * The negative amount returned will be sent to the caller after the swap.
+     * The negative amount returned will be sent to the recipient after the swap.
      *
      * Requirements:
      *
@@ -377,8 +377,8 @@ contract TMMarket is ITMMarket {
             (uint256 liquidity, uint256 fee) =
                 currentSqrtRatioX96 >= sqrtRatioBX96 ? (liquidityB, feeB) : (liquidityA, feeA);
             uint256 targetRatioX96 = (zeroForOne
-                        ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
-                        : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
+                    ? currentSqrtRatioX96 >= sqrtRatioBX96 && sqrtRatioLimitX96 < sqrtRatioBX96
+                    : currentSqrtRatioX96 < sqrtRatioBX96 && sqrtRatioLimitX96 >= sqrtRatioBX96)
                 ? sqrtRatioBX96
                 : sqrtRatioLimitX96;
 
