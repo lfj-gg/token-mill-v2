@@ -12,7 +12,7 @@ Fees can be different on the two sides of the curve.
 
 ## King of the Mill
 
-Token Mill V2 redirects swap fees to a fee pool, that will be used for an aidrop program called King of the Mill (KotM). Every period, fees accumulated will be used to airdrop tokens to a randomly selected set of holders of the winning token (selected based on market cap and volume).
+Token Mill V2 redirects swap fees to a fee pool, that will be used for an aidrop program called King of the Mill (KotM). Every period, fees accumulated will be airdropped to a randomly selected set of holders of the winning token (selected based on market cap and volume).
 
 
 ## Contracts
